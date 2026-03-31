@@ -5,37 +5,22 @@ Team: Pooja Singh, Rana Shamoun, Rishi Sheth, Pramod Yadav
 
 ---
 
-## 📌 Project Overview
+## 📌 Overview
 
-This project focuses on accelerating Inverse Lithography Technology (ILT) using deep learning.
+This project explores the use of deep learning to accelerate **Inverse Lithography Technology (ILT)**.
 
-We implement and compare:
+We compare:
 
-- Baseline Model: U-Net style CNN (vanilla architecture)
-- Proposed Model: Depthwise Separable CNN (DS-CNN)
+- Baseline U-Net CNN  
+- Depthwise Separable CNN (DS-CNN)  
 
-The goal is to evaluate whether lightweight CNN architectures can reduce computational cost while maintaining mask prediction quality.
-
----
-
-## 👩‍💻 My Contribution
-
-- Designed and structured the GitHub repository  
-- Implemented the data preprocessing pipeline  
-- Handled dataset integration (LithoBench MetalSet)  
-- Set up baseline training pipeline (vanilla CNN / U-Net)  
-- Enabled scalable preprocessing using MAX_SAMPLES  
-- Added Docker support for reproducibility  
-- Created a docker-compose.yml (currently empty) for potential future multi-service setup  
+The goal is to improve computational efficiency while maintaining mask prediction quality.
 
 ---
 
 ## 📂 Dataset
 
-We use the LithoBench MetalSet dataset:
-
-- target → input layout patterns  
-- litho → ground truth mask outputs  
+We use the **LithoBench MetalSet dataset**.
 
 Required structure:
 
@@ -45,52 +30,21 @@ data/raw/MetalSet/
 
 ---
 
-## ⚙️ Preprocessing
+## ⚙️ Quick Start
 
-The preprocessing script:
-
-- Converts images to grayscale  
-- Normalizes pixel values to [0, 1]  
-- Saves processed layout-mask pairs  
-
-Run preprocessing (full dataset):
+Run preprocessing:
 
 python -m src.data.preprocess
 
-Run with sample (recommended for local machines):
-
-MAX_SAMPLES=5000 python -m src.data.preprocess
-
-Other examples:
-
-MAX_SAMPLES=1000 python -m src.data.preprocess  
-MAX_SAMPLES=3000 python -m src.data.preprocess  
-
----
-
-## 🧠 How Sampling Works
-
-- MAX_SAMPLES controls number of layout-mask pairs  
-- If not set → full dataset is used  
-- If set → subset is used  
-
----
-
-## ⚠️ Important Notes
-
-- Full preprocessing may require 70GB+ storage  
-- Use subsets for local runs  
-- Designed for scalable execution across environments  
-
----
-
-## 🧠 Training (Baseline Model)
+Run training:
 
 python -m src.train
 
 ---
 
-## 📊 Evaluation Metrics
+## 📊 Evaluation
+
+Models are evaluated using:
 
 - MSE (Mean Squared Error)  
 - SSIM (Structural Similarity Index)  
@@ -98,93 +52,25 @@ python -m src.train
 
 ---
 
-## 🐳 Docker Usage
+## 🐳 Docker (Optional)
 
-Docker is used to ensure reproducibility and consistent environment setup.
-
-Build Docker image:
+Build:
 
 docker build -t ilt-project .
 
-Run container:
+Run:
 
 docker run -it -v $(pwd):/app ilt-project
 
-Inside container:
+---
 
-python -m src.data.preprocess  
-python -m src.train  
+## 📌 Notes
 
-Run with subset inside Docker:
-
-MAX_SAMPLES=5000 python -m src.data.preprocess  
+- Use subsets of data for local runs if needed  
+- Full dataset experiments may require high-memory or GPU systems  
 
 ---
 
-## 🧩 docker-compose (Future Use)
+## 🚀 Project Goal
 
-A docker-compose.yml file has been added (currently empty) to support future extensions such as:
-
-- Model serving API  
-- Visualization dashboards (Streamlit/Gradio)  
-- Multi-container workflows  
-
----
-
-## 🗂️ Project Structure
-
-ilt-ds-cnn/
-  README.md  
-  src/
-    data/
-      preprocess.py
-      dataset.py
-    train.py
-  data/
-    raw/
-      MetalSet/
-        target/
-        litho/
-    processed/
-  configs/      (empty)
-  scripts/      (empty)
-  requirements.txt
-  Dockerfile
-  docker-compose.yml
-
----
-
-## 🛠️ Files Created / Modified
-
-- src/data/preprocess.py → preprocessing pipeline  
-- src/data/dataset.py → dataset loader  
-- README.md → documentation  
-- requirements.txt → dependencies  
-- Dockerfile → container setup  
-- docker-compose.yml → created (currently empty)  
-- configs/ → created (empty)  
-- scripts/ → created (empty)  
-
----
-
-## 🚀 Team Workflow
-
-- Pooja: preprocessing + baseline  
-- Rana:
-- Pramod:
-- Rishi:
-
----
-
-## 💡 Notes
-
-Due to hardware constraints:
-
-- Local runs use dataset subsets  
-- Full dataset runs should be done on high-memory or GPU systems  
-
----
-
-## 📌 Summary
-
-Raw Dataset → Preprocessing → Baseline Training → Evaluation → DS-CNN Comparison
+Improve efficiency of ILT models while maintaining high-quality mask predictions.
