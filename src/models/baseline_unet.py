@@ -1,7 +1,3 @@
-"""
-Baseline U-Net for ILT (target → litho)
-"""
-
 import torch
 import torch.nn as nn
 
@@ -24,21 +20,37 @@ class UNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.enc1 = DoubleConv(1, 64)
-        self.pool = nn.MaxPool2d(2)
-        self.enc2 = DoubleConv(64, 128)
+        self.down1 = DoubleConv(1, 64)
+        self.pool1 = nn.MaxPool2d(2)
 
-        self.up = nn.ConvTranspose2d(128, 64, 2, stride=2)
-        self.dec1 = DoubleConv(128, 64)
+        self.down2 = DoubleConv(64, 128)
+        self.pool2 = nn.MaxPool2d(2)
 
-        self.out = nn.Conv2d(64, 1, 1)
+        self.bottleneck = DoubleConv(128, 256)
+
+        self.up2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.conv2 = DoubleConv(256, 128)
+
+        self.up1 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.conv1 = DoubleConv(128, 64)
+
+        self.final = nn.Conv2d(64, 1, 1)
 
     def forward(self, x):
-        x1 = self.enc1(x)
-        x2 = self.enc2(self.pool(x1))
+        d1 = self.down1(x)
+        p1 = self.pool1(d1)
 
-        x = self.up(x2)
-        x = torch.cat([x, x1], dim=1)
-        x = self.dec1(x)
+        d2 = self.down2(p1)
+        p2 = self.pool2(d2)
 
-        return torch.sigmoid(self.out(x))
+        b = self.bottleneck(p2)
+
+        u2 = self.up2(b)
+        u2 = torch.cat([u2, d2], dim=1)
+        u2 = self.conv2(u2)
+
+        u1 = self.up1(u2)
+        u1 = torch.cat([u1, d1], dim=1)
+        u1 = self.conv1(u1)
+
+        return self.final(u1)
