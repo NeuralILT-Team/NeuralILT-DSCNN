@@ -68,7 +68,7 @@ docker run -it -v $(pwd):/app ilt-project
 
 - Use subsets of data for local runs if needed  
 - Full dataset experiments may require high-memory or GPU systems  
-
+- For detailed setup and experimentation, refer to development branches.
 ---
 
 ## 🚀 Project Goal
