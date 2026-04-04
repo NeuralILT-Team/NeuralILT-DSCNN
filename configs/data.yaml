@@ -1,0 +1,34 @@
+# Data configuration for LithoBench MetalSet
+# Aligned with CMPE 257 project proposal
+
+raw_dir: data/raw/MetalSet
+processed_dir: data/processed/MetalSet
+
+# Dataset split ratios (proposal: 80/10/10)
+train_ratio: 0.8
+val_ratio: 0.1
+test_ratio: 0.1
+
+# Fixed seed for reproducible splits
+split_seed: 42
+
+# Image properties
+image_size: 256
+channels: 1
+
+# DataLoader settings
+batch_size: 16
+num_workers: 4
+pin_memory: true
+
+# Data augmentation (physically valid transforms only)
+augmentation:
+  enabled: true
+  horizontal_flip: true
+  vertical_flip: true
+  rotate_90: true
+  # No photometric transforms — pixel values have physical significance
+
+# Subset control for local development
+# Set to -1 for full dataset, or a positive integer for subset
+max_samples: -1

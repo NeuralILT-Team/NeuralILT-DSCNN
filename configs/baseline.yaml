@@ -1,7 +1,25 @@
-model: baseline
-epochs: 50
-batch_size: 16
-learning_rate: 1e-4
-loss: mse
-optimizer: adam
-dataset: MetalSet
+# Baseline U-Net configuration
+# Standard convolution encoder-decoder as per LithoBench NeuralILT
+
+model:
+  name: baseline
+  in_channels: 1
+  out_channels: 1
+  features: [64, 128, 256, 512]  # 4-level encoder-decoder
+
+training:
+  epochs: 50
+  batch_size: 16
+  learning_rate: 1.0e-4
+  weight_decay: 0.0
+  optimizer: adam
+  scheduler:
+    type: cosine
+    min_lr: 1.0e-6
+  loss: mse
+  grad_clip: 1.0
+
+# Checkpoint and logging
+checkpoint_dir: results/checkpoints/baseline
+log_dir: results/logs/baseline
+save_every: 10

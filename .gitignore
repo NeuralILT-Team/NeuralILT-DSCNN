@@ -1,5 +1,20 @@
 __pycache__/
 *.pyc
-data/*
-results/*
+*.pyo
+.DS_Store
+
+# data (too large for git)
+data/
+
+# results and checkpoints
+results/
 *.pt
+
+# environment
+.venv/
+.idea/
+*.egg-info/
+
+# slurm logs
+slurm_*.out
+slurm_*.err
