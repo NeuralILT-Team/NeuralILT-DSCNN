@@ -32,6 +32,7 @@ NeuralILT-DSCNN/
 │   ├── raw/MetalSet/        # Raw LithoBench data (target/ and litho/)
 │   └── processed/MetalSet/  # Preprocessed layouts/ and masks/
 ├── docs/
+│   ├── ARCHITECTURE.md      # Architecture and design docs
 │   └── CMPE_257_Project_Proposal_*.pdf
 ├── scripts/
 │   ├── run_preprocess.sh    # Preprocess raw data
@@ -39,7 +40,7 @@ NeuralILT-DSCNN/
 │   ├── run_dscnn.sh         # Train DS-CNN model
 │   ├── run_eval.sh          # Evaluate and compare models
 │   ├── run_visualize.sh     # Generate plots
-│   └── run_hpc.sh           # SLURM job script for HPC
+│   └── run_hpc.sh           # SLURM job script for HPC cluster
 ├── src/
 │   ├── data/                # Dataset, transforms, splitting
 │   ├── losses/              # Loss functions (MSE)
@@ -51,23 +52,18 @@ NeuralILT-DSCNN/
 │   ├── infer.py             # Single-image inference
 │   └── visualize.py         # Plotting utilities
 ├── results/                 # Checkpoints, logs, figures (gitignored)
-├── Dockerfile
-├── docker-compose.yml
 └── requirements.txt
 ```
 
 ---
 
-## Setup
+## Local Setup
 
 ### 1. Environment
 
 ```bash
-# create virtual environment
 python -m venv .venv
 source .venv/bin/activate
-
-# install dependencies
 pip install -r requirements.txt
 ```
 
@@ -144,41 +140,92 @@ This computes and prints:
 python -m src.visualize --mode curves --log-dir results/logs
 
 # efficiency comparison bar charts
-python -m src.visualize --mode efficiency --results results/comparison.json
+python -m src.visualize --mode efficiency --results results/eval_results.json
 ```
 
 ---
 
 ## Running on HPC (SLURM)
 
-For running on the university HPC cluster:
+The project includes a SLURM job script for running on university HPC clusters (e.g., SJSU CoS HPC).
+
+### First-time HPC setup
 
 ```bash
-# run everything (preprocess → train both → evaluate → plot)
+# 1. SSH into the cluster
+ssh <your-id>@coe-hpc1.sjsu.edu
+
+# 2. Clone the repo
+git clone git@github.com:NeuralILT-Team/NeuralILT-DSCNN.git
+cd NeuralILT-DSCNN
+
+# 3. Create a conda environment (or use venv)
+module load anaconda3
+conda create -n neuralilt python=3.11 -y
+conda activate neuralilt
+pip install -r requirements.txt
+
+# 4. Upload the dataset to data/raw/MetalSet/
+#    (use scp or rsync from your local machine)
+scp -r data/raw/MetalSet/ <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/data/raw/
+
+# 5. Edit scripts/run_hpc.sh to uncomment the module load
+#    and conda activate lines for your cluster
+```
+
+### Submitting jobs
+
+```bash
+# Run the full pipeline (preprocess → train both → evaluate → plot)
 sbatch scripts/run_hpc.sh
 
-# or run individual steps
+# Or run individual steps
+sbatch scripts/run_hpc.sh preprocess
 sbatch scripts/run_hpc.sh baseline
 sbatch scripts/run_hpc.sh dscnn
 sbatch scripts/run_hpc.sh eval
 ```
 
-Edit the module load and conda/venv activation lines in `scripts/run_hpc.sh` to match your cluster setup.
+### SLURM job configuration
 
----
+The default settings in `scripts/run_hpc.sh` are:
 
-## Docker (Optional)
+| Setting | Value |
+|---------|-------|
+| Partition | `gpu` |
+| GPUs | 1 |
+| CPUs | 4 |
+| Memory | 32 GB |
+| Time limit | 12 hours |
+
+Adjust these in the `#SBATCH` directives at the top of the script if your cluster has different partition names or resource limits.
+
+### Monitoring jobs
 
 ```bash
-docker build -t neuralilt-dscnn .
-docker run -it -v $(pwd)/data:/app/data -v $(pwd)/results:/app/results neuralilt-dscnn
+# check job status
+squeue -u $USER
+
+# view output logs
+tail -f slurm_<job_id>.out
+
+# cancel a job
+scancel <job_id>
 ```
 
-Or use docker-compose:
+### Collecting results
+
+After jobs complete, results are in:
+- `results/checkpoints/baseline/` — baseline model checkpoints
+- `results/checkpoints/dscnn/` — DS-CNN model checkpoints
+- `results/logs/` — training metrics (CSV + JSON)
+- `results/comparison.json` — side-by-side comparison
+- `results/training_curves.png` — loss/metric plots
+- `results/efficiency.png` — parameter/FLOPs comparison chart
+
+Copy results back to your local machine:
 ```bash
-docker-compose run train-baseline
-docker-compose run train-dscnn
-docker-compose run evaluate
+scp -r <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/results/ ./results/
 ```
 
 ---
