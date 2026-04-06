@@ -89,9 +89,10 @@ download_metalset() {
     fi
 
     echo ""
-    echo ">>> Downloading MetalSet from Google Drive..."
+    echo ">>> Downloading LithoBench data from Google Drive..."
     echo "    Source: https://drive.google.com/file/d/${GDRIVE_FILE_ID}"
-    echo "    This is ~2GB — may take a few minutes."
+    echo "    Size: ~15GB (contains all subsets: MetalSet, ViaSet, etc.)"
+    echo "    We only use MetalSet (16,472 tiles) for this project."
     echo ""
 
     local tarball="${DATA_DIR}/lithodata.tar.gz"
