@@ -1,21 +1,17 @@
 #!/bin/bash
-# Download LithoBench dataset from the official GitHub repository.
+# Download LithoBench dataset for NeuralILT-DSCNN experiments.
 #
-# Run this on the login node (has internet access):
-#   bash scripts/download_data.sh
-#   bash scripts/download_data.sh MetalSet       # just MetalSet
-#   bash scripts/download_data.sh all             # all subsets
+# The LithoBench dataset has two parts:
+#   1. MetalSet (main data): hosted on Google Drive as lithodata.tar.gz
+#      Contains target/ (layouts) and litho/ (masks) — 16,472 tile pairs
+#   2. StdMetal/StdContact (generalization): in the LithoBench git repo
+#      Contains .glp layout files (271 + 328 files)
 #
-# The LithoBench dataset is hosted at:
-#   https://github.com/shelljane/lithobench
+# Run on the login node (has internet):
+#   bash scripts/download_data.sh          # download MetalSet (main)
+#   bash scripts/download_data.sh all      # download everything
 #
-# Dataset structure after download:
-#   data/raw/MetalSet/target/   (16,472 layout tiles)
-#   data/raw/MetalSet/litho/    (16,472 mask tiles)
-#   data/raw/StdMetal/target/   (271 tiles)
-#   data/raw/StdMetal/litho/    (271 tiles)
-#   data/raw/StdContact/target/ (328 tiles)
-#   data/raw/StdContact/litho/  (328 tiles)
+# Source: https://github.com/shelljane/lithobench
 
 set -euo pipefail
 
@@ -26,138 +22,222 @@ elif [ -f "download_data.sh" ]; then
     cd ..
 fi
 
-DATASET="${1:-MetalSet}"
 DATA_DIR="data/raw"
-REPO_URL="https://github.com/shelljane/lithobench"
-
 mkdir -p "$DATA_DIR"
+
+# Google Drive file ID for lithodata.tar.gz
+GDRIVE_FILE_ID="1MzYiRRxi8Eu2L6WHCfZ1DtRnjVNOl4vu"
 
 echo "============================================"
 echo "LithoBench Dataset Download"
 echo "============================================"
 
-download_dataset() {
-    local name="$1"
-    local target_dir="${DATA_DIR}/${name}"
+# ─────────────────────────────────────────────────────────────────────
+# Download from Google Drive (handles the confirmation page)
+# ─────────────────────────────────────────────────────────────────────
+download_gdrive() {
+    local file_id="$1"
+    local output="$2"
 
-    if [ -d "${target_dir}/target" ] && [ -d "${target_dir}/litho" ]; then
-        n_target=$(ls "${target_dir}/target/" 2>/dev/null | wc -l)
-        echo "[OK] ${name} already exists (${n_target} tiles)"
+    echo "  Downloading from Google Drive..."
+    echo "  File ID: ${file_id}"
+    echo "  Output:  ${output}"
+    echo ""
+
+    # Method 1: gdown (Python tool, handles large files well)
+    if command -v gdown &>/dev/null; then
+        echo "  Using gdown..."
+        gdown "https://drive.google.com/uc?id=${file_id}" -O "$output"
+        return $?
+    fi
+
+    # Method 2: pip install gdown and use it
+    if command -v pip &>/dev/null; then
+        echo "  Installing gdown..."
+        pip install --quiet gdown
+        gdown "https://drive.google.com/uc?id=${file_id}" -O "$output"
+        return $?
+    fi
+
+    # Method 3: curl with cookie handling (for large files)
+    echo "  Using curl (may need confirmation for large files)..."
+    local confirm_code
+    confirm_code=$(curl -sc /tmp/gdrive_cookie \
+        "https://drive.google.com/uc?export=download&id=${file_id}" \
+        | grep -o 'confirm=[^&]*' | cut -d= -f2)
+
+    if [ -n "$confirm_code" ]; then
+        curl -Lb /tmp/gdrive_cookie \
+            "https://drive.google.com/uc?export=download&confirm=${confirm_code}&id=${file_id}" \
+            -o "$output"
+    else
+        curl -L \
+            "https://drive.google.com/uc?export=download&id=${file_id}" \
+            -o "$output"
+    fi
+    rm -f /tmp/gdrive_cookie
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# Download MetalSet from Google Drive
+# ─────────────────────────────────────────────────────────────────────
+download_metalset() {
+    if [ -d "${DATA_DIR}/MetalSet/target" ] && [ -d "${DATA_DIR}/MetalSet/litho" ]; then
+        n=$(ls "${DATA_DIR}/MetalSet/target/" 2>/dev/null | wc -l)
+        echo "[OK] MetalSet already exists (${n} tiles)"
         return 0
     fi
 
     echo ""
-    echo "Downloading ${name}..."
+    echo ">>> Downloading MetalSet from Google Drive..."
+    echo "    Source: https://drive.google.com/file/d/${GDRIVE_FILE_ID}"
+    echo "    This is ~2GB — may take a few minutes."
+    echo ""
 
-    # Method 1: Try cloning just the data we need using sparse checkout
-    # (avoids downloading the entire repo with code)
-    TEMP_DIR=$(mktemp -d)
-    trap "rm -rf $TEMP_DIR" EXIT
+    local tarball="${DATA_DIR}/lithodata.tar.gz"
 
-    echo "  Cloning LithoBench repo (sparse checkout)..."
-    git clone --depth 1 --filter=blob:none --sparse \
-        "${REPO_URL}.git" "$TEMP_DIR/lithobench" 2>/dev/null || {
+    download_gdrive "$GDRIVE_FILE_ID" "$tarball"
 
-        # Method 2: If sparse checkout fails, try full clone
-        echo "  Sparse checkout failed, trying full clone..."
-        rm -rf "$TEMP_DIR/lithobench"
-        git clone --depth 1 "${REPO_URL}.git" "$TEMP_DIR/lithobench" 2>/dev/null || {
-
-            # Method 3: Download as zip
-            echo "  Git clone failed, trying zip download..."
-            curl -L -o "$TEMP_DIR/lithobench.zip" \
-                "${REPO_URL}/archive/refs/heads/main.zip" 2>/dev/null || \
-            wget -q -O "$TEMP_DIR/lithobench.zip" \
-                "${REPO_URL}/archive/refs/heads/main.zip" 2>/dev/null || {
-                echo "  ERROR: Could not download. Check internet connection."
-                echo "  Manual download: ${REPO_URL}"
-                return 1
-            }
-            cd "$TEMP_DIR"
-            unzip -q lithobench.zip
-            mv lithobench-main lithobench 2>/dev/null || true
-            cd -
-        }
-    }
-
-    # Find the dataset in the cloned/downloaded repo
-    # LithoBench organizes data as: lithobench/data/<DatasetName>/
-    # or sometimes: lithobench/<DatasetName>/
-    FOUND=""
-    for search_path in \
-        "$TEMP_DIR/lithobench/data/${name}" \
-        "$TEMP_DIR/lithobench/${name}" \
-        "$TEMP_DIR/lithobench/dataset/${name}" \
-        "$TEMP_DIR/lithobench/datasets/${name}"; do
-        if [ -d "$search_path" ]; then
-            FOUND="$search_path"
-            break
-        fi
-    done
-
-    if [ -z "$FOUND" ]; then
-        echo "  WARNING: Could not find ${name} in downloaded repo."
-        echo "  Searched in: $TEMP_DIR/lithobench/"
+    if [ ! -f "$tarball" ] || [ ! -s "$tarball" ]; then
         echo ""
-        echo "  The LithoBench dataset may need to be downloaded separately."
-        echo "  Check: ${REPO_URL} for download instructions."
+        echo "ERROR: Download failed or file is empty."
         echo ""
-        echo "  You can also manually place the data at:"
-        echo "    ${target_dir}/target/  (layout tiles)"
-        echo "    ${target_dir}/litho/   (mask tiles)"
-
-        # List what we found to help debug
-        echo ""
-        echo "  Contents of downloaded repo:"
-        ls -la "$TEMP_DIR/lithobench/" 2>/dev/null || echo "  (empty)"
-        find "$TEMP_DIR/lithobench/" -maxdepth 3 -type d 2>/dev/null | head -20
+        echo "Please download manually:"
+        echo "  1. Open: https://drive.google.com/file/d/${GDRIVE_FILE_ID}/view"
+        echo "  2. Click 'Download'"
+        echo "  3. Upload to HPC: scp lithodata.tar.gz <user>@hpc:~/NeuralILT-DSCNN/${DATA_DIR}/"
+        echo "  4. Run: bash scripts/download_data.sh extract"
         return 1
     fi
 
-    echo "  Found ${name} at: ${FOUND}"
-    mkdir -p "$target_dir"
-    cp -r "$FOUND"/* "$target_dir/"
+    echo ""
+    echo "Extracting lithodata.tar.gz..."
+    tar xzf "$tarball" -C "$DATA_DIR/"
+
+    # The tarball may extract to different structures — find MetalSet
+    if [ ! -d "${DATA_DIR}/MetalSet" ]; then
+        # search for it
+        FOUND=$(find "${DATA_DIR}" -maxdepth 3 -type d -name "MetalSet" | head -1)
+        if [ -n "$FOUND" ]; then
+            echo "Found MetalSet at: $FOUND"
+            mv "$FOUND" "${DATA_DIR}/MetalSet"
+        else
+            echo "WARNING: MetalSet directory not found after extraction."
+            echo "Contents of ${DATA_DIR}/:"
+            ls -la "${DATA_DIR}/"
+            find "${DATA_DIR}/" -maxdepth 3 -type d | head -20
+        fi
+    fi
 
     # verify
-    if [ -d "${target_dir}/target" ]; then
-        n=$(ls "${target_dir}/target/" 2>/dev/null | wc -l)
-        echo "  [OK] ${name}: ${n} tiles downloaded"
+    if [ -d "${DATA_DIR}/MetalSet/target" ]; then
+        n=$(ls "${DATA_DIR}/MetalSet/target/" 2>/dev/null | wc -l)
+        echo "[OK] MetalSet: ${n} layout tiles"
     else
-        echo "  WARNING: ${name} downloaded but target/ directory not found"
-        echo "  Contents: $(ls ${target_dir}/ 2>/dev/null)"
+        echo "WARNING: MetalSet/target/ not found"
+    fi
+
+    # clean up tarball to save space
+    rm -f "$tarball"
+    echo "Cleaned up tarball."
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# Download StdMetal/StdContact from git repo (benchmark/ directory)
+# ─────────────────────────────────────────────────────────────────────
+download_benchmarks() {
+    echo ""
+    echo ">>> Downloading StdMetal and StdContact from LithoBench repo..."
+
+    local TEMP_DIR
+    TEMP_DIR=$(mktemp -d)
+
+    git clone --depth 1 --filter=blob:none --sparse \
+        https://github.com/shelljane/lithobench.git "$TEMP_DIR/lithobench" 2>/dev/null
+
+    cd "$TEMP_DIR/lithobench"
+    git sparse-checkout set benchmark/StdMetal benchmark/StdContact 2>/dev/null || {
+        # fallback: just use what we got
+        echo "  Sparse checkout not supported, using full clone..."
+        cd "$TEMP_DIR"
+        rm -rf lithobench
+        git clone --depth 1 https://github.com/shelljane/lithobench.git "$TEMP_DIR/lithobench"
+    }
+    cd - >/dev/null
+
+    # Copy StdMetal
+    if [ -d "$TEMP_DIR/lithobench/benchmark/StdMetal" ]; then
+        mkdir -p "${DATA_DIR}/StdMetal"
+        cp -r "$TEMP_DIR/lithobench/benchmark/StdMetal" "${DATA_DIR}/"
+        n=$(ls "${DATA_DIR}/StdMetal/" 2>/dev/null | wc -l)
+        echo "[OK] StdMetal: ${n} files"
+    else
+        echo "[SKIP] StdMetal not found in repo"
+    fi
+
+    # Copy StdContact
+    if [ -d "$TEMP_DIR/lithobench/benchmark/StdContact" ]; then
+        mkdir -p "${DATA_DIR}/StdContact"
+        cp -r "$TEMP_DIR/lithobench/benchmark/StdContact" "${DATA_DIR}/"
+        n=$(ls "${DATA_DIR}/StdContact/" 2>/dev/null | wc -l)
+        echo "[OK] StdContact: ${n} files"
+    else
+        echo "[SKIP] StdContact not found in repo"
     fi
 
     rm -rf "$TEMP_DIR"
-    trap - EXIT
 }
 
-case "$DATASET" in
+# ─────────────────────────────────────────────────────────────────────
+# Extract a manually uploaded tarball
+# ─────────────────────────────────────────────────────────────────────
+extract_tarball() {
+    local tarball="${DATA_DIR}/lithodata.tar.gz"
+    if [ ! -f "$tarball" ]; then
+        echo "No tarball found at ${tarball}"
+        echo "Upload it first: scp lithodata.tar.gz <user>@hpc:~/NeuralILT-DSCNN/${DATA_DIR}/"
+        return 1
+    fi
+    echo "Extracting ${tarball}..."
+    tar xzf "$tarball" -C "$DATA_DIR/"
+    echo "Done. Contents:"
+    ls -la "${DATA_DIR}/"
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────
+MODE="${1:-MetalSet}"
+
+case "$MODE" in
     MetalSet)
-        download_dataset "MetalSet"
+        download_metalset
         ;;
-    StdMetal)
-        download_dataset "StdMetal"
+    benchmarks|StdMetal|StdContact)
+        download_benchmarks
         ;;
-    StdContact)
-        download_dataset "StdContact"
+    extract)
+        extract_tarball
         ;;
     all)
-        download_dataset "MetalSet"
-        download_dataset "StdMetal"
-        download_dataset "StdContact"
+        download_metalset
+        download_benchmarks
         ;;
     *)
-        echo "Usage: bash scripts/download_data.sh [MetalSet|StdMetal|StdContact|all]"
+        echo "Usage: bash scripts/download_data.sh [MetalSet|benchmarks|extract|all]"
+        echo ""
+        echo "  MetalSet    — download main dataset from Google Drive (~2GB)"
+        echo "  benchmarks  — download StdMetal/StdContact from GitHub"
+        echo "  extract     — extract a manually uploaded lithodata.tar.gz"
+        echo "  all         — download everything"
         exit 1
         ;;
 esac
 
 echo ""
 echo "============================================"
-echo "Download complete. Dataset location:"
-echo "  ${DATA_DIR}/"
+echo "Dataset location: ${DATA_DIR}/"
 ls -la "${DATA_DIR}/" 2>/dev/null
 echo ""
-echo "Next step: preprocess the data"
-echo "  python -m src.data.preprocess --all"
+echo "Next: python -m src.data.preprocess --all"
 echo "============================================"
