@@ -30,32 +30,57 @@ from src.utils.io import load_config, merge_configs, save_checkpoint
 from src.utils.metrics_logger import MetricsLogger
 
 
-def train_one_epoch(model, loader, optimizer, loss_fn, device, grad_clip=0.0):
-    """Run one training epoch. Returns average loss."""
+def train_one_epoch(model, loader, optimizer, loss_fn, device, grad_clip=0.0,
+                    scaler=None, accum_steps=1):
+    """
+    Run one training epoch with optional mixed precision and gradient accumulation.
+
+    Args:
+        scaler: torch.cuda.amp.GradScaler for mixed precision (None = disabled)
+        accum_steps: gradient accumulation steps (effective batch = batch_size * accum_steps)
+    """
     model.train()
     total_loss = 0.0
     n = 0
 
-    for layouts, masks in loader:
+    optimizer.zero_grad()
+
+    for step, (layouts, masks) in enumerate(loader):
         layouts, masks = layouts.to(device), masks.to(device)
 
-        preds = model(layouts)
-        loss = loss_fn(preds, masks)
+        # mixed precision forward pass
+        if scaler is not None:
+            with torch.amp.autocast('cuda'):
+                preds = model(layouts)
+                loss = loss_fn(preds, masks) / accum_steps
+            scaler.scale(loss).backward()
+        else:
+            preds = model(layouts)
+            loss = loss_fn(preds, masks) / accum_steps
+            loss.backward()
 
-        optimizer.zero_grad()
-        loss.backward()
-        if grad_clip > 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-        optimizer.step()
+        # step optimizer every accum_steps
+        if (step + 1) % accum_steps == 0 or (step + 1) == len(loader):
+            if scaler is not None:
+                if grad_clip > 0:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                if grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                optimizer.step()
+            optimizer.zero_grad()
 
-        total_loss += loss.item()
+        total_loss += loss.item() * accum_steps  # undo the division for logging
         n += 1
 
     return {"train_loss": total_loss / max(n, 1)}
 
 
 @torch.no_grad()
-def validate(model, loader, loss_fn, device):
+def validate(model, loader, loss_fn, device, use_amp=False):
     """Run validation. Returns loss, MSE, and SSIM."""
     model.eval()
     total_loss = 0.0
@@ -65,9 +90,17 @@ def validate(model, loader, loss_fn, device):
 
     for layouts, masks in loader:
         layouts, masks = layouts.to(device), masks.to(device)
-        preds = model(layouts)
 
-        total_loss += loss_fn(preds, masks).item()
+        if use_amp:
+            with torch.amp.autocast('cuda'):
+                preds = model(layouts)
+                total_loss += loss_fn(preds, masks).item()
+            # metrics in float32 for accuracy
+            preds = preds.float()
+        else:
+            preds = model(layouts)
+            total_loss += loss_fn(preds, masks).item()
+
         total_mse += compute_mse_batch(preds, masks)
         total_ssim += compute_ssim_batch(preds, masks)
         n += 1
@@ -91,7 +124,7 @@ def train(config, run_name=None):
 
     # data
     train_cfg = config.get("training", {})
-    bs = train_cfg.get("batch_size", 16)
+    bs = train_cfg.get("batch_size", 4)  # default 4 for 12GB GPU
     train_loader, val_loader, _ = get_dataloaders(config, batch_size=bs)
     print(f"Train: {len(train_loader.dataset)} samples, Val: {len(val_loader.dataset)} samples")
 
@@ -120,6 +153,16 @@ def train(config, run_name=None):
     loss_fn = get_loss(train_cfg.get("loss", "mse"))
     grad_clip = train_cfg.get("grad_clip", 0.0)
 
+    # mixed precision + gradient accumulation
+    use_amp = train_cfg.get("mixed_precision", False) and device.type == 'cuda'
+    accum_steps = train_cfg.get("grad_accumulation", 1)
+    scaler = torch.amp.GradScaler('cuda') if use_amp else None
+
+    if use_amp:
+        print(f"Mixed precision: ON (float16)")
+    if accum_steps > 1:
+        print(f"Gradient accumulation: {accum_steps} steps (effective batch = {bs * accum_steps})")
+
     # logging
     log_dir = config.get("log_dir", f"results/logs/{model_name}")
     ckpt_dir = config.get("checkpoint_dir", f"results/checkpoints/{model_name}")
@@ -128,13 +171,14 @@ def train(config, run_name=None):
 
     # training loop
     best_val_loss = float("inf")
-    print(f"\nTraining for {epochs} epochs (lr={lr})...")
+    print(f"\nTraining for {epochs} epochs (lr={lr}, batch={bs})...")
     print("=" * 65)
 
     for epoch in range(1, epochs + 1):
         train_metrics = train_one_epoch(model, train_loader, optimizer,
-                                        loss_fn, device, grad_clip)
-        val_metrics = validate(model, val_loader, loss_fn, device)
+                                        loss_fn, device, grad_clip,
+                                        scaler=scaler, accum_steps=accum_steps)
+        val_metrics = validate(model, val_loader, loss_fn, device, use_amp=use_amp)
 
         cur_lr = optimizer.param_groups[0]["lr"]
         if scheduler:
