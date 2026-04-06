@@ -193,8 +193,23 @@ prepare_data() {
     echo ""
     echo ">>> Preparing dataset..."
 
+    # Check if already processed (skip everything if so)
+    if [ -d "data/processed/MetalSet/layouts" ] && [ -d "data/processed/MetalSet/masks" ]; then
+        n=$(ls data/processed/MetalSet/layouts/ 2>/dev/null | wc -l)
+        if [ "$n" -gt 0 ]; then
+            echo "[OK] Processed data already exists (${n} tiles) — skipping"
+            # still ensure split exists
+            if [ ! -f "data/processed/MetalSet/splits.json" ]; then
+                echo "Generating splits..."
+                python -m src.data.split_data
+            fi
+            return 0
+        fi
+    fi
+
     mkdir -p data/raw data/processed
 
+    # Check for raw data
     if [ -d "data/raw/MetalSet/target" ] && [ -d "data/raw/MetalSet/litho" ]; then
         echo "Raw dataset found at data/raw/MetalSet/"
     elif [ -n "$DATASET_PATH" ] && [ -d "$DATASET_PATH" ]; then
@@ -202,12 +217,10 @@ prepare_data() {
         cp -r "$DATASET_PATH" data/raw/MetalSet
     else
         echo "Dataset not found locally. Attempting download..."
-        bash scripts/download_data.sh all || {
+        bash scripts/download_data.sh MetalSet || {
             echo ""
             echo "Auto-download failed. Please download manually:"
-            echo "  bash scripts/download_data.sh all    (on login node)"
-            echo "  OR"
-            echo "  scp -r /local/path/MetalSet/ $(whoami)@$(hostname):${PROJECT_DIR}/data/raw/"
+            echo "  bash scripts/download_data.sh MetalSet  (on login node)"
             exit 1
         }
     fi
@@ -221,7 +234,6 @@ prepare_data() {
     python -m src.data.preprocess --dataset MetalSet
 
     # preprocess generalization datasets if available
-    echo "Preprocessing generalization datasets (if available)..."
     python -m src.data.preprocess --dataset StdMetal 2>/dev/null || true
     python -m src.data.preprocess --dataset StdContact 2>/dev/null || true
 

@@ -82,22 +82,28 @@ download_gdrive() {
 # Download MetalSet from Google Drive
 # ─────────────────────────────────────────────────────────────────────
 download_metalset() {
+    # Skip if data already exists
     if [ -d "${DATA_DIR}/MetalSet/target" ] && [ -d "${DATA_DIR}/MetalSet/litho" ]; then
         n=$(ls "${DATA_DIR}/MetalSet/target/" 2>/dev/null | wc -l)
-        echo "[OK] MetalSet already exists (${n} tiles)"
+        echo "[OK] MetalSet already exists at ${DATA_DIR}/MetalSet/ (${n} tiles) — skipping download"
         return 0
     fi
 
-    echo ""
-    echo ">>> Downloading LithoBench data from Google Drive..."
-    echo "    Source: https://drive.google.com/file/d/${GDRIVE_FILE_ID}"
-    echo "    Size: ~15GB (contains all subsets: MetalSet, ViaSet, etc.)"
-    echo "    We only use MetalSet (16,472 tiles) for this project."
-    echo ""
-
     local tarball="${DATA_DIR}/lithodata.tar.gz"
 
-    download_gdrive "$GDRIVE_FILE_ID" "$tarball"
+    # Skip download if tarball already exists (just extract)
+    if [ -f "$tarball" ]; then
+        echo "[OK] Tarball already exists at ${tarball} — skipping download, extracting..."
+    else
+        echo ""
+        echo ">>> Downloading LithoBench data from Google Drive..."
+        echo "    Source: https://drive.google.com/file/d/${GDRIVE_FILE_ID}"
+        echo "    Size: ~15GB (contains all subsets: MetalSet, ViaSet, etc.)"
+        echo "    We only use MetalSet (16,472 tiles) for this project."
+        echo ""
+
+        download_gdrive "$GDRIVE_FILE_ID" "$tarball"
+    fi
 
     if [ ! -f "$tarball" ] || [ ! -s "$tarball" ]; then
         echo ""
