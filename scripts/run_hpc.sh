@@ -1,50 +1,44 @@
 #!/bin/bash
 #SBATCH --job-name=neuralilt
-#SBATCH --output=slurm_%j.out
-#SBATCH --error=slurm_%j.err
+#SBATCH --output=logs/slurm_%j.out
+#SBATCH --error=logs/slurm_%j.err
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
 #
-# Self-contained HPC script for NeuralILT-DSCNN experiments.
+# NeuralILT-DSCNN — SJSU CoE HPC Experiment Runner
 #
-# This script handles everything:
-#   1. Environment setup (conda/venv + pip install)
-#   2. Dataset download and preprocessing
-#   3. Train/val/test splitting
-#   4. Training both models (baseline + DS-CNN)
-#   5. Evaluation and comparison
-#   6. Generating plots
+# FIRST TIME SETUP (run on the login node — has internet):
+#   bash scripts/run_hpc.sh setup
 #
-# Submit:
-#   sbatch scripts/run_hpc.sh
+# Then submit experiments:
+#   sbatch scripts/run_hpc.sh            # full pipeline
+#   sbatch scripts/run_hpc.sh baseline   # train baseline only
+#   sbatch scripts/run_hpc.sh dscnn      # train DS-CNN only
+#   sbatch scripts/run_hpc.sh eval       # evaluation only
 #
-# Or run a single step:
-#   sbatch scripts/run_hpc.sh setup
-#   sbatch scripts/run_hpc.sh preprocess
-#   sbatch scripts/run_hpc.sh baseline
-#   sbatch scripts/run_hpc.sh dscnn
-#   sbatch scripts/run_hpc.sh eval
-#   sbatch scripts/run_hpc.sh all       (default)
+# SJSU HPC notes:
+#   - Login node: GLIBC 2.17 (CentOS 7), has internet, no GCC
+#   - GPU nodes:  GLIBC 2.17, no internet, have GPU
+#   - /home is shared across all nodes
+#   - Setup downloads pre-built wheels on login node (no compilation)
+#   - Batch jobs use the venv created during setup
 
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────
-# CONFIG — edit these for your cluster
+# CONFIG
 # ─────────────────────────────────────────────────────────────────────
-ENV_NAME="neuralilt"
-PYTHON_VERSION="3.11"
-DATASET_URL=""  # set this if dataset is hosted somewhere downloadable
-# If dataset is already on the cluster, set this path:
+# If dataset is already somewhere on the cluster, set this path:
 DATASET_PATH=""  # e.g., /shared/datasets/lithobench/MetalSet
 
 # ─────────────────────────────────────────────────────────────────────
-# SETUP
+# PROJECT DIR
 # ─────────────────────────────────────────────────────────────────────
-
-# go to project root (works whether submitted from project dir or scripts/)
 if [ -f "scripts/run_hpc.sh" ]; then
     PROJECT_DIR="$(pwd)"
 elif [ -f "run_hpc.sh" ]; then
@@ -54,8 +48,12 @@ else
 fi
 cd "$PROJECT_DIR"
 
+mkdir -p logs results
+
+VENV_DIR="${PROJECT_DIR}/venv"
+
 echo "============================================"
-echo "NeuralILT-DSCNN HPC Job"
+echo "NeuralILT-DSCNN — HPC Job"
 echo "============================================"
 echo "Job ID:      ${SLURM_JOB_ID:-local}"
 echo "Node:        ${SLURM_NODELIST:-$(hostname)}"
@@ -64,110 +62,167 @@ echo "Date:        $(date)"
 echo "============================================"
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 1: Environment setup
+# ENVIRONMENT ACTIVATION (used by batch jobs — no internet needed)
 # ─────────────────────────────────────────────────────────────────────
-setup_environment() {
-    echo ""
-    echo ">>> Setting up environment..."
-
-    # try loading modules (common on HPC clusters)
-    module load python/${PYTHON_VERSION} 2>/dev/null || true
+activate_env() {
+    module load python3 2>/dev/null || true
     module load cuda 2>/dev/null || true
     module load cudnn 2>/dev/null || true
-    module load anaconda3 2>/dev/null || true
 
-    # create conda env if it doesn't exist
-    if command -v conda &>/dev/null; then
-        if ! conda env list | grep -q "^${ENV_NAME} "; then
-            echo "Creating conda environment: ${ENV_NAME}"
-            conda create -n "${ENV_NAME}" python="${PYTHON_VERSION}" -y
-        fi
-        echo "Activating conda environment: ${ENV_NAME}"
-        source activate "${ENV_NAME}" 2>/dev/null || conda activate "${ENV_NAME}"
+    if [ -f "${VENV_DIR}/bin/activate" ]; then
+        source "${VENV_DIR}/bin/activate"
+        echo "Activated venv: $(python --version)"
     else
-        # fallback to venv
-        if [ ! -d ".venv" ]; then
-            echo "Creating venv..."
-            python3 -m venv .venv
-        fi
-        source .venv/bin/activate
+        echo "ERROR: venv not found at ${VENV_DIR}"
+        echo "Run setup first on the login node:"
+        echo "  bash scripts/run_hpc.sh setup"
+        exit 1
     fi
 
-    # install dependencies
-    echo "Installing Python dependencies..."
-    pip install --quiet --upgrade pip
-    pip install --quiet -r requirements.txt
+    # project root on PYTHONPATH so 'import src' works
+    export PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH:-}"
 
-    # verify setup
+    # GPU check
+    echo ""
+    echo "--- PyTorch Backend Check ---"
     python -c "
 import torch
-print(f'Python:  {__import__(\"sys\").version.split()[0]}')
-print(f'PyTorch: {torch.__version__}')
-print(f'CUDA:    {torch.cuda.is_available()}')
+print(f'  PyTorch: {torch.__version__}')
+print(f'  CUDA available: {torch.cuda.is_available()}')
 if torch.cuda.is_available():
-    print(f'GPU:     {torch.cuda.get_device_name(0)}')
-    print(f'Memory:  {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
-"
-    echo "Environment ready."
+    print(f'  GPU: {torch.cuda.get_device_name(0)}')
+    print(f'  Memory: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+else:
+    print('  WARNING: No GPU detected. Training will be slow.')
+" 2>/dev/null || echo "  WARNING: PyTorch import failed"
+    echo "-----------------------------"
+    echo ""
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 2: Dataset preparation
+# STEP 0: One-time setup (run on LOGIN NODE — has internet)
+# ─────────────────────────────────────────────────────────────────────
+setup_environment() {
+    echo ""
+    echo ">>> One-time environment setup"
+    echo ">>> Run this on the LOGIN NODE (has internet access)"
+    echo ""
+
+    module load python3 2>/dev/null || true
+
+    echo "Python: $(python3 --version 2>&1)"
+    echo "Node:   $(hostname)"
+    echo ""
+
+    # Create venv
+    if [ ! -d "${VENV_DIR}" ]; then
+        echo "Creating virtual environment..."
+        python3 -m venv "${VENV_DIR}"
+    fi
+
+    source "${VENV_DIR}/bin/activate"
+    echo "Activated venv: $(which python)"
+
+    # Upgrade pip first — system pip may not handle manylinux2014 properly
+    echo "Upgrading pip..."
+    python -m pip install --upgrade pip setuptools wheel
+
+    echo ""
+    echo "Installing dependencies..."
+    echo ""
+
+    # Download all wheels first (binary only, no source builds).
+    # This is critical on SJSU HPC — no GCC on login node, no internet
+    # on GPU nodes. We download everything here and install from cache.
+    WHEEL_DIR="${PROJECT_DIR}/.wheels"
+    mkdir -p "$WHEEL_DIR"
+
+    echo "  Downloading binary wheels to .wheels/ ..."
+
+    # PyTorch with CUDA — these are large (~2GB) but only downloaded once.
+    # Using CUDA 12.1 wheels which are compatible with SJSU HPC.
+    pip download --only-binary=:all: --dest "$WHEEL_DIR" \
+        torch==2.2.2 torchvision==0.17.2 \
+        --index-url https://download.pytorch.org/whl/cu121
+
+    # Other dependencies
+    pip download --only-binary=:all: --dest "$WHEEL_DIR" \
+        numpy==1.26.4 scipy==1.13.1 Pillow==10.4.0 \
+        scikit-image==0.22.0 matplotlib==3.9.2 \
+        pyyaml==6.0.1 tqdm==4.66.5 pandas==2.2.2
+
+    echo ""
+    echo "  Installing from downloaded wheels..."
+
+    # Install PyTorch first (from PyTorch index)
+    pip install --no-index --find-links="$WHEEL_DIR" \
+        torch==2.2.2 torchvision==0.17.2
+
+    # Install everything else
+    pip install --no-index --find-links="$WHEEL_DIR" \
+        numpy==1.26.4 scipy==1.13.1 Pillow==10.4.0 \
+        scikit-image==0.22.0 matplotlib==3.9.2 \
+        pyyaml==6.0.1 tqdm==4.66.5 pandas==2.2.2
+
+    # thop is pure Python, install directly
+    pip install thop 2>/dev/null || echo "  (thop install skipped — optional)"
+
+    # Install project in editable mode
+    pip install -e . 2>/dev/null || echo "  (editable install skipped)"
+
+    echo ""
+    echo "Setup complete. Verify with:"
+    echo "  python scripts/verify_env.py"
+    echo ""
+    echo "Then submit jobs with:"
+    echo "  sbatch scripts/run_hpc.sh"
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# STEP 1: Dataset preparation
 # ─────────────────────────────────────────────────────────────────────
 prepare_data() {
     echo ""
     echo ">>> Preparing dataset..."
 
-    # create data directories
     mkdir -p data/raw data/processed
 
-    # check if raw data exists
     if [ -d "data/raw/MetalSet/target" ] && [ -d "data/raw/MetalSet/litho" ]; then
         echo "Raw dataset found at data/raw/MetalSet/"
     elif [ -n "$DATASET_PATH" ] && [ -d "$DATASET_PATH" ]; then
         echo "Copying dataset from $DATASET_PATH..."
         cp -r "$DATASET_PATH" data/raw/MetalSet
-    elif [ -n "$DATASET_URL" ]; then
-        echo "Downloading dataset from $DATASET_URL..."
-        wget -q -O data/raw/lithobench.tar.gz "$DATASET_URL"
-        tar -xzf data/raw/lithobench.tar.gz -C data/raw/
-        rm data/raw/lithobench.tar.gz
     else
         echo "ERROR: No dataset found!"
         echo ""
-        echo "Please do one of the following:"
-        echo "  1. Place data at: data/raw/MetalSet/{target,litho}/"
-        echo "  2. Set DATASET_PATH in this script to point to existing data"
-        echo "  3. Set DATASET_URL to download the dataset"
+        echo "Upload the dataset to the cluster first:"
+        echo "  scp -r /local/path/MetalSet/ $(whoami)@$(hostname):${PROJECT_DIR}/data/raw/"
         echo ""
-        echo "You can copy data to the cluster with:"
-        echo "  scp -r /local/path/MetalSet/ user@hpc:$(pwd)/data/raw/"
+        echo "Expected structure:"
+        echo "  data/raw/MetalSet/target/   (layout tiles)"
+        echo "  data/raw/MetalSet/litho/    (mask tiles)"
         exit 1
     fi
 
-    # count files
     n_target=$(ls data/raw/MetalSet/target/ 2>/dev/null | wc -l)
     n_litho=$(ls data/raw/MetalSet/litho/ 2>/dev/null | wc -l)
     echo "Found $n_target target tiles, $n_litho litho tiles"
 
-    # run preprocessing
     echo "Running preprocessing..."
     python -m src.data.preprocess
 
-    # run train/val/test split
-    echo "Splitting dataset..."
+    echo "Splitting dataset (80/10/10)..."
     python -m src.data.split_data
 
     echo "Dataset ready."
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 3: Training
+# STEP 2: Training
 # ─────────────────────────────────────────────────────────────────────
 train_baseline() {
     echo ""
     echo ">>> Training baseline U-Net..."
-    echo "    Config: configs/baseline.yaml"
     python -m src.train --config configs/baseline.yaml --data-config configs/data.yaml
     echo "Baseline training done."
 }
@@ -175,13 +230,12 @@ train_baseline() {
 train_dscnn() {
     echo ""
     echo ">>> Training DS-CNN U-Net..."
-    echo "    Config: configs/dscnn.yaml"
     python -m src.train --config configs/dscnn.yaml --data-config configs/data.yaml
     echo "DS-CNN training done."
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 4: Evaluation
+# STEP 3: Evaluation
 # ─────────────────────────────────────────────────────────────────────
 run_eval() {
     echo ""
@@ -191,7 +245,7 @@ run_eval() {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 5: Visualization
+# STEP 4: Visualization
 # ─────────────────────────────────────────────────────────────────────
 run_visualize() {
     echo ""
@@ -210,26 +264,27 @@ MODE="${1:-all}"
 
 case "$MODE" in
     setup)
+        # setup runs on login node (has internet) — NOT via sbatch
         setup_environment
         ;;
     preprocess)
-        setup_environment
+        activate_env
         prepare_data
         ;;
     baseline)
-        setup_environment
+        activate_env
         train_baseline
         ;;
     dscnn)
-        setup_environment
+        activate_env
         train_dscnn
         ;;
     eval)
-        setup_environment
+        activate_env
         run_eval
         ;;
     all)
-        setup_environment
+        activate_env
         prepare_data
         train_baseline
         train_dscnn
@@ -237,7 +292,12 @@ case "$MODE" in
         run_visualize
         ;;
     *)
-        echo "Usage: sbatch scripts/run_hpc.sh [setup|preprocess|baseline|dscnn|eval|all]"
+        echo "Usage:"
+        echo "  bash scripts/run_hpc.sh setup     # first time (login node)"
+        echo "  sbatch scripts/run_hpc.sh          # full pipeline (GPU node)"
+        echo "  sbatch scripts/run_hpc.sh baseline # train baseline only"
+        echo "  sbatch scripts/run_hpc.sh dscnn    # train DS-CNN only"
+        echo "  sbatch scripts/run_hpc.sh eval     # evaluate only"
         exit 1
         ;;
 esac
@@ -250,5 +310,5 @@ echo "Results:"
 ls -la results/ 2>/dev/null || echo "  (no results directory)"
 echo ""
 echo "To copy results to your local machine:"
-echo "  scp -r $(whoami)@$(hostname):${PROJECT_DIR}/results/ ./results/"
+echo "  scp -r $(whoami)@$(hostname -f 2>/dev/null || hostname):${PROJECT_DIR}/results/ ./results/"
 echo "============================================"

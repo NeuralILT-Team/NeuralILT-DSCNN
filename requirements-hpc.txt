@@ -1,0 +1,29 @@
+# Pinned dependencies for SJSU CoE HPC (GLIBC 2.17, Python 3.11)
+#
+# SJSU HPC runs CentOS 7 with GLIBC 2.17. All packages with C extensions
+# must be installed as binary wheels (no compilation — no GCC on login node).
+#
+# Install with: pip install --only-binary=:all: -r requirements-hpc.txt
+# Or use the setup script: bash scripts/run_hpc.sh setup
+
+# PyTorch (CUDA 12.1 — matches SJSU HPC CUDA version)
+# These are large wheels (~2GB) — download once, reuse from .wheels/
+torch==2.2.2
+torchvision==0.17.2
+
+# Numerical (C extensions — need binary wheels)
+numpy==1.26.4
+scipy==1.13.1
+Pillow==10.4.0
+
+# Image metrics (C extension via cython)
+scikit-image==0.22.0
+
+# Pure Python packages (install normally)
+pyyaml==6.0.1
+matplotlib==3.9.2
+tqdm==4.66.5
+pandas==2.2.2
+
+# Model profiling (pure Python)
+thop==0.1.1.post2209072238

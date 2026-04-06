@@ -12,9 +12,12 @@ results/
 
 # environment
 .venv/
+venv/
 .idea/
 *.egg-info/
 
-# slurm logs
+# HPC artifacts
+.wheels/
+logs/
 slurm_*.out
 slurm_*.err

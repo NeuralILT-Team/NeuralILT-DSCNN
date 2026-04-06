@@ -35,12 +35,15 @@ NeuralILT-DSCNN/
 │   ├── ARCHITECTURE.md      # Architecture and design docs
 │   └── CMPE_257_Project_Proposal_*.pdf
 ├── scripts/
-│   ├── run_preprocess.sh    # Preprocess raw data
-│   ├── run_baseline.sh      # Train baseline model
-│   ├── run_dscnn.sh         # Train DS-CNN model
-│   ├── run_eval.sh          # Evaluate and compare models
-│   ├── run_visualize.sh     # Generate plots
-│   └── run_hpc.sh           # SLURM job script for HPC cluster
+│   ├── run_hpc.sh           # SLURM job script (SJSU HPC)
+│   ├── verify_env.py        # Check all imports before submitting
+│   ├── validate_pipeline.py # Test full pipeline with synthetic data
+│   ├── hpc_aliases.sh       # Convenience aliases for HPC
+│   ├── run_baseline.sh      # Train baseline (local)
+│   ├── run_dscnn.sh         # Train DS-CNN (local)
+│   ├── run_eval.sh          # Evaluate (local)
+│   ├── run_preprocess.sh    # Preprocess data (local)
+│   └── run_visualize.sh     # Generate plots (local)
 ├── src/
 │   ├── data/                # Dataset, transforms, splitting
 │   ├── losses/              # Loss functions (MSE)
@@ -52,7 +55,9 @@ NeuralILT-DSCNN/
 │   ├── infer.py             # Single-image inference
 │   └── visualize.py         # Plotting utilities
 ├── results/                 # Checkpoints, logs, figures (gitignored)
-└── requirements.txt
+├── requirements.txt         # Dependencies (flexible versions)
+├── requirements-hpc.txt     # Dependencies (pinned for SJSU HPC)
+└── setup.py                 # Package installation
 ```
 
 ---
@@ -84,8 +89,6 @@ python -m src.data.preprocess
 python -m src.data.split_data
 ```
 
-This normalizes images to [0,1], converts to grayscale, and creates an 80/10/10 train/val/test split.
-
 For local development with a smaller subset:
 ```bash
 MAX_SAMPLES=5000 python -m src.data.preprocess
@@ -95,100 +98,125 @@ MAX_SAMPLES=5000 python -m src.data.preprocess
 
 ## Training
 
-### Baseline U-Net
-
 ```bash
+# Baseline U-Net
 python -m src.train --config configs/baseline.yaml
-```
 
-### DS-CNN U-Net (proposed)
-
-```bash
+# DS-CNN U-Net (proposed)
 python -m src.train --config configs/dscnn.yaml
 ```
 
-Both models use the same training setup (Adam optimizer, MSE loss, cosine LR schedule, 50 epochs) for a fair comparison.
-
----
-
 ## Evaluation
 
-### Evaluate a single model
-
 ```bash
-python -m src.evaluate \
-    --config configs/baseline.yaml \
+# Compare both models
+python -m src.evaluate --compare
+
+# Single model
+python -m src.evaluate --config configs/baseline.yaml \
     --checkpoint results/checkpoints/baseline/best_model.pt
 ```
-
-### Compare both models
-
-```bash
-python -m src.evaluate --compare
-```
-
-This computes and prints:
-- **Accuracy metrics**: MSE, SSIM, EPE
-- **Efficiency metrics**: parameter count, FLOPs, inference runtime
-
----
 
 ## Visualization
 
 ```bash
-# training loss curves
 python -m src.visualize --mode curves --log-dir results/logs
-
-# efficiency comparison bar charts
 python -m src.visualize --mode efficiency --results results/eval_results.json
 ```
 
 ---
 
-## Running on HPC (SLURM)
+## Running on SJSU HPC (SLURM)
 
-The project includes a SLURM job script for running on university HPC clusters (e.g., SJSU CoS HPC).
+The SJSU CoE HPC cluster runs CentOS 7 with GLIBC 2.17. Key constraints:
+- **Login node**: has internet, no GPU, no GCC
+- **GPU nodes**: have GPU, no internet
+- **/home is shared** across all nodes
 
-### First-time HPC setup
+This means we download pre-built binary wheels on the login node, then run training on GPU nodes using the cached wheels.
+
+### Step 1: Upload code and data
 
 ```bash
-# 1. SSH into the cluster
+# SSH into the cluster
 ssh <your-id>@coe-hpc1.sjsu.edu
 
-# 2. Clone the repo
-git clone git@github.com:NeuralILT-Team/NeuralILT-DSCNN.git
+# Clone the repo
+git clone <repo-url>
 cd NeuralILT-DSCNN
 
-# 3. Create a conda environment (or use venv)
-module load anaconda3
-conda create -n neuralilt python=3.11 -y
-conda activate neuralilt
-pip install -r requirements.txt
-
-# 4. Upload the dataset to data/raw/MetalSet/
-#    (use scp or rsync from your local machine)
+# Upload dataset (from your local machine)
 scp -r data/raw/MetalSet/ <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/data/raw/
-
-# 5. Edit scripts/run_hpc.sh to uncomment the module load
-#    and conda activate lines for your cluster
 ```
 
-### Submitting jobs
+### Step 2: One-time setup (on login node)
 
 ```bash
-# Run the full pipeline (preprocess → train both → evaluate → plot)
+# This downloads all wheels and creates the venv
+# Must run on login node (has internet)
+bash scripts/run_hpc.sh setup
+```
+
+This will:
+1. Create a venv at `./venv/`
+2. Download PyTorch CUDA wheels (~2GB) to `.wheels/`
+3. Install all dependencies from cached wheels
+4. Install the project in editable mode
+
+### Step 3: Verify environment
+
+```bash
+# Check all imports work
+python scripts/verify_env.py
+
+# Test the full pipeline with synthetic data
+python scripts/validate_pipeline.py
+```
+
+### Step 4: Submit jobs
+
+```bash
+# Full pipeline (preprocess → train both → evaluate → plot)
 sbatch scripts/run_hpc.sh
 
-# Or run individual steps
+# Or individual steps
 sbatch scripts/run_hpc.sh preprocess
 sbatch scripts/run_hpc.sh baseline
 sbatch scripts/run_hpc.sh dscnn
 sbatch scripts/run_hpc.sh eval
 ```
 
-### SLURM job configuration
+### Step 5: Monitor and collect results
 
-The default settings in `scripts/run_hpc.sh` are:
+```bash
+# Check job status
+squeue -u $USER
+
+# Tail the latest log
+tail -f logs/slurm_*.out
+
+# Copy results to local machine
+scp -r <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/results/ ./results/
+```
+
+### HPC convenience aliases
+
+```bash
+# Load aliases (or add to ~/.bashrc)
+source scripts/hpc_aliases.sh
+
+# Then use shortcuts:
+ilt-setup       # one-time setup
+ilt-verify      # check environment
+ilt-validate    # test pipeline
+ilt-run         # submit full pipeline
+ilt-baseline    # train baseline only
+ilt-dscnn       # train DS-CNN only
+lastlog         # tail latest output
+gpunode         # get interactive GPU session
+```
+
+### SLURM job defaults
 
 | Setting | Value |
 |---------|-------|
@@ -198,35 +226,7 @@ The default settings in `scripts/run_hpc.sh` are:
 | Memory | 32 GB |
 | Time limit | 12 hours |
 
-Adjust these in the `#SBATCH` directives at the top of the script if your cluster has different partition names or resource limits.
-
-### Monitoring jobs
-
-```bash
-# check job status
-squeue -u $USER
-
-# view output logs
-tail -f slurm_<job_id>.out
-
-# cancel a job
-scancel <job_id>
-```
-
-### Collecting results
-
-After jobs complete, results are in:
-- `results/checkpoints/baseline/` — baseline model checkpoints
-- `results/checkpoints/dscnn/` — DS-CNN model checkpoints
-- `results/logs/` — training metrics (CSV + JSON)
-- `results/comparison.json` — side-by-side comparison
-- `results/training_curves.png` — loss/metric plots
-- `results/efficiency.png` — parameter/FLOPs comparison chart
-
-Copy results back to your local machine:
-```bash
-scp -r <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/results/ ./results/
-```
+Edit the `#SBATCH` directives in `scripts/run_hpc.sh` if needed.
 
 ---
 
@@ -236,30 +236,27 @@ scp -r <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/results/ ./results/
 
 | Metric | Description |
 |--------|-------------|
-| **MSE** | Mean Squared Error — pixel-level difference between predicted and GT masks |
-| **SSIM** | Structural Similarity Index — perceptual similarity (edges, contrast) |
-| **EPE** | Edge Placement Error — distance between predicted and GT mask edges (in pixels) |
+| **MSE** | Mean Squared Error — pixel-level difference |
+| **SSIM** | Structural Similarity Index — perceptual similarity |
+| **EPE** | Edge Placement Error — mask edge distance (pixels) |
 
 ### Efficiency Metrics
 
 | Metric | Description |
 |--------|-------------|
 | **Parameters** | Total trainable parameters |
-| **FLOPs** | Floating-point operations for one forward pass |
-| **Runtime** | GPU inference time per image (ms) |
-| **Memory** | Peak GPU memory during inference (MB) |
+| **FLOPs** | Floating-point operations per forward pass |
+| **Runtime** | GPU inference time (ms) |
+| **Memory** | Peak GPU memory (MB) |
 
 ---
 
 ## Key Design Decisions
 
-1. **Same architecture depth**: Both models use [64, 128, 256, 512] feature channels so the comparison isolates the effect of the convolution type.
-
+1. **Same architecture depth**: Both models use [64, 128, 256, 512] feature channels for fair comparison.
 2. **BatchNorm after every conv**: Stabilizes training for both architectures.
-
-3. **No photometric augmentation**: Pixel values have physical meaning in lithography, so we only use geometric transforms (flips, 90° rotations).
-
-4. **Fixed random seed (42)**: Ensures reproducible data splits and training.
+3. **No photometric augmentation**: Pixel values have physical meaning in lithography.
+4. **Fixed random seed (42)**: Reproducible data splits and training.
 
 ---
 
@@ -267,11 +264,3 @@ scp -r <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/results/ ./results/
 
 1. S. Zheng et al., "LithoBench: Benchmarking AI Computational Lithography for Semiconductor Manufacturing," NeurIPS 2023.
 2. A. G. Howard et al., "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications," arXiv:1704.04861, 2017.
-
----
-
-## Notes
-
-- Use subsets of data for local runs if needed (`MAX_SAMPLES=5000`)
-- Full dataset experiments require a GPU (Google Colab T4 or HPC)
-- See `docs/` for the full project proposal
