@@ -170,13 +170,19 @@ setup_environment() {
     # Install project in editable mode
     pip install -e . 2>/dev/null || echo "  (editable install skipped)"
 
+    # Download dataset (login node has internet)
     echo ""
-    echo "Setup complete."
+    echo "Downloading LithoBench dataset..."
+    bash scripts/download_data.sh all
+
+    # Verify environment
     echo ""
-    echo "Next steps:"
-    echo "  1. Download data:  bash scripts/download_data.sh all"
-    echo "  2. Verify env:     python scripts/verify_env.py"
-    echo "  3. Submit jobs:    sbatch scripts/run_hpc.sh"
+    echo "Verifying environment..."
+    python scripts/verify_env.py || true
+
+    echo ""
+    echo "Setup complete. Ready to submit:"
+    echo "  sbatch scripts/run_hpc.sh"
 }
 
 # ─────────────────────────────────────────────────────────────────────
