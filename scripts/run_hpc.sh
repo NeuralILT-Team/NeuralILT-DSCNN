@@ -171,11 +171,12 @@ setup_environment() {
     pip install -e . 2>/dev/null || echo "  (editable install skipped)"
 
     echo ""
-    echo "Setup complete. Verify with:"
-    echo "  python scripts/verify_env.py"
+    echo "Setup complete."
     echo ""
-    echo "Then submit jobs with:"
-    echo "  sbatch scripts/run_hpc.sh"
+    echo "Next steps:"
+    echo "  1. Download data:  bash scripts/download_data.sh all"
+    echo "  2. Verify env:     python scripts/verify_env.py"
+    echo "  3. Submit jobs:    sbatch scripts/run_hpc.sh"
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -193,15 +194,15 @@ prepare_data() {
         echo "Copying dataset from $DATASET_PATH..."
         cp -r "$DATASET_PATH" data/raw/MetalSet
     else
-        echo "ERROR: No dataset found!"
-        echo ""
-        echo "Upload the dataset to the cluster first:"
-        echo "  scp -r /local/path/MetalSet/ $(whoami)@$(hostname):${PROJECT_DIR}/data/raw/"
-        echo ""
-        echo "Expected structure:"
-        echo "  data/raw/MetalSet/target/   (layout tiles)"
-        echo "  data/raw/MetalSet/litho/    (mask tiles)"
-        exit 1
+        echo "Dataset not found locally. Attempting download..."
+        bash scripts/download_data.sh all || {
+            echo ""
+            echo "Auto-download failed. Please download manually:"
+            echo "  bash scripts/download_data.sh all    (on login node)"
+            echo "  OR"
+            echo "  scp -r /local/path/MetalSet/ $(whoami)@$(hostname):${PROJECT_DIR}/data/raw/"
+            exit 1
+        }
     fi
 
     n_target=$(ls data/raw/MetalSet/target/ 2>/dev/null | wc -l)

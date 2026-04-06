@@ -14,6 +14,7 @@ alias killall='scancel -u $USER'
 
 # ─── Quick submit ────────────────────────────────────────────────────
 alias ilt-setup='bash scripts/run_hpc.sh setup'
+alias ilt-download='bash scripts/download_data.sh all'
 alias ilt-verify='python scripts/verify_env.py'
 alias ilt-validate='python scripts/validate_pipeline.py'
 alias ilt-run='sbatch scripts/run_hpc.sh'
@@ -21,6 +22,7 @@ alias ilt-baseline='sbatch scripts/run_hpc.sh baseline'
 alias ilt-dscnn='sbatch scripts/run_hpc.sh dscnn'
 alias ilt-eval='sbatch scripts/run_hpc.sh eval'
 alias ilt-generalize='sbatch scripts/run_hpc.sh generalize'
+alias ilt-analyze='python scripts/analyze_data.py all'
 
 # ─── Log viewing ─────────────────────────────────────────────────────
 alias lastlog='ls -t logs/slurm_*.out 2>/dev/null | head -1 | xargs tail -f'
