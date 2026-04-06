@@ -146,52 +146,81 @@ download_metalset() {
     echo "File size: $(echo "$file_size / 1048576" | bc 2>/dev/null || echo "$file_size") MB"
 
     echo ""
-    echo "Extracting lithodata.tar.gz (this may take 15-30 min for ~15GB)..."
+    echo "Extracting ONLY MetalSet from lithodata.tar.gz..."
+    echo "  (skipping ViaSet and other subsets to save disk space)"
+    echo ""
 
-    # Use pv for progress bar if available, otherwise verbose tar
-    if command -v pv &>/dev/null; then
-        pv "$tarball" | tar xzf - -C "$DATA_DIR/"
+    # First, find the MetalSet path inside the tarball
+    echo "  Scanning tarball for MetalSet path..."
+    local metalset_path
+    metalset_path=$(tar tzf "$tarball" | grep -m1 "MetalSet" | cut -d'/' -f1-2)
+
+    if [ -z "$metalset_path" ]; then
+        # try broader search
+        metalset_path=$(tar tzf "$tarball" | grep -i "metal" | head -1 | cut -d'/' -f1-2)
+    fi
+
+    if [ -n "$metalset_path" ]; then
+        echo "  Found MetalSet at: ${metalset_path}"
+        echo "  Extracting (this takes a few minutes)..."
+
+        # Extract only MetalSet — much faster and smaller than full extraction
+        if command -v pv &>/dev/null; then
+            pv "$tarball" | tar xzf - -C "$DATA_DIR/" --wildcards "*MetalSet*"
+        else
+            tar xzvf "$tarball" -C "$DATA_DIR/" --wildcards "*MetalSet*" 2>&1 | \
+                awk 'NR % 500 == 0 {print "  " NR " files extracted..."}'
+        fi
     else
-        echo "  (install 'pv' for a progress bar: sudo apt install pv)"
-        echo "  Using verbose mode — printing every 1000th file..."
-        tar xzvf "$tarball" -C "$DATA_DIR/" 2>&1 | awk 'NR % 1000 == 0 {print "  " NR " files extracted..."}'
+        echo "  WARNING: Could not find MetalSet path in tarball."
+        echo "  Listing tarball contents:"
+        tar tzf "$tarball" | head -30
+        echo ""
+        echo "  Extracting everything (this will take longer)..."
+        tar xzf "$tarball" -C "$DATA_DIR/"
     fi
 
     if [ $? -ne 0 ]; then
         echo ""
-        echo "ERROR: Extraction failed. The tarball may be corrupted."
-        echo "Try re-downloading:"
-        echo "  rm ${tarball}"
-        echo "  bash scripts/download_data.sh MetalSet"
+        echo "ERROR: Extraction failed (possibly out of disk space)."
+        echo "Check: df -h ."
+        echo "Try: rm -rf data/raw/ViaSet && bash scripts/download_data.sh extract"
         return 1
     fi
 
-    # The tarball may extract to different structures — find MetalSet
+    # Find MetalSet wherever it landed
     if [ ! -d "${DATA_DIR}/MetalSet" ]; then
-        # search for it
-        FOUND=$(find "${DATA_DIR}" -maxdepth 3 -type d -name "MetalSet" | head -1)
-        if [ -n "$FOUND" ]; then
-            echo "Found MetalSet at: $FOUND"
+        FOUND=$(find "${DATA_DIR}" -maxdepth 4 -type d -name "MetalSet" | head -1)
+        if [ -n "$FOUND" ] && [ "$FOUND" != "${DATA_DIR}/MetalSet" ]; then
+            echo "  Moving MetalSet from $FOUND to ${DATA_DIR}/MetalSet"
             mv "$FOUND" "${DATA_DIR}/MetalSet"
-        else
-            echo "WARNING: MetalSet directory not found after extraction."
-            echo "Contents of ${DATA_DIR}/:"
-            ls -la "${DATA_DIR}/"
-            find "${DATA_DIR}/" -maxdepth 3 -type d | head -20
         fi
     fi
 
-    # verify
+    # Verify
     if [ -d "${DATA_DIR}/MetalSet/target" ]; then
         n=$(ls "${DATA_DIR}/MetalSet/target/" 2>/dev/null | wc -l)
-        echo "[OK] MetalSet: ${n} layout tiles"
+        echo ""
+        echo "[OK] MetalSet: ${n} layout tiles extracted"
+    elif [ -d "${DATA_DIR}/MetalSet" ]; then
+        echo ""
+        echo "[OK] MetalSet directory found. Contents:"
+        ls "${DATA_DIR}/MetalSet/"
     else
-        echo "WARNING: MetalSet/target/ not found"
+        echo ""
+        echo "WARNING: MetalSet not found after extraction."
+        echo "Contents of ${DATA_DIR}/:"
+        ls -la "${DATA_DIR}/"
+        find "${DATA_DIR}/" -maxdepth 3 -type d | head -20
     fi
 
-    # clean up tarball to save space
+    # Clean up: delete tarball and any unwanted subsets
+    echo ""
+    echo "Cleaning up to save disk space..."
+    rm -rf "${DATA_DIR}/ViaSet" "${DATA_DIR}/StdContact" "${DATA_DIR}/ICCAD2013" 2>/dev/null
     rm -f "$tarball"
-    echo "Cleaned up tarball."
+    echo "Cleaned up. Remaining:"
+    du -sh "${DATA_DIR}/"* 2>/dev/null
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -253,10 +282,22 @@ extract_tarball() {
         echo "Upload it first: scp lithodata.tar.gz <user>@hpc:~/NeuralILT-DSCNN/${DATA_DIR}/"
         return 1
     fi
-    echo "Extracting ${tarball}..."
-    tar xzf "$tarball" -C "$DATA_DIR/"
+    echo "Extracting ONLY MetalSet from ${tarball}..."
+    echo "  (skipping ViaSet and other subsets to save disk space)"
+    tar xzvf "$tarball" -C "$DATA_DIR/" --wildcards '*MetalSet*' 2>&1 | \
+        awk 'NR % 500 == 0 {print "  " NR " files..."}'
+
+    # Find and move MetalSet if needed
+    if [ ! -d "${DATA_DIR}/MetalSet" ]; then
+        FOUND=$(find "${DATA_DIR}" -maxdepth 4 -type d -name "MetalSet" | head -1)
+        if [ -n "$FOUND" ]; then
+            mv "$FOUND" "${DATA_DIR}/MetalSet"
+        fi
+    fi
+
+    echo ""
     echo "Done. Contents:"
-    ls -la "${DATA_DIR}/"
+    du -sh "${DATA_DIR}/"* 2>/dev/null
 }
 
 # ─────────────────────────────────────────────────────────────────────
