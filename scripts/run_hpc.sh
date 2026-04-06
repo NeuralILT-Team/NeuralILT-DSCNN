@@ -271,6 +271,12 @@ run_visualize() {
     echo "Plots saved to results/"
 }
 
+run_analyze() {
+    echo ""
+    echo ">>> Analyzing dataset and results..."
+    python scripts/analyze_data.py all
+}
+
 # ─────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────
@@ -301,6 +307,10 @@ case "$MODE" in
         activate_env
         run_generalize
         ;;
+    analyze)
+        activate_env
+        run_analyze
+        ;;
     all)
         activate_env
         prepare_data
@@ -309,6 +319,7 @@ case "$MODE" in
         run_eval
         run_generalize
         run_visualize
+        run_analyze
         ;;
     *)
         echo "Usage:"
@@ -318,6 +329,7 @@ case "$MODE" in
         echo "  sbatch scripts/run_hpc.sh dscnn      # train DS-CNN only"
         echo "  sbatch scripts/run_hpc.sh eval       # Experiment 3: MetalSet comparison"
         echo "  sbatch scripts/run_hpc.sh generalize # Experiment 4: StdMetal/StdContact"
+        echo "  sbatch scripts/run_hpc.sh analyze    # dataset + results analysis"
         exit 1
         ;;
 esac
