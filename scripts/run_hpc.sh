@@ -208,10 +208,17 @@ prepare_data() {
     n_litho=$(ls data/raw/MetalSet/litho/ 2>/dev/null | wc -l)
     echo "Found $n_target target tiles, $n_litho litho tiles"
 
-    echo "Running preprocessing..."
-    python -m src.data.preprocess
+    # preprocess MetalSet (primary training data)
+    echo "Preprocessing MetalSet..."
+    python -m src.data.preprocess --dataset MetalSet
 
-    echo "Splitting dataset (80/10/10)..."
+    # preprocess generalization datasets if available
+    echo "Preprocessing generalization datasets (if available)..."
+    python -m src.data.preprocess --dataset StdMetal 2>/dev/null || true
+    python -m src.data.preprocess --dataset StdContact 2>/dev/null || true
+
+    # split MetalSet into train/val/test
+    echo "Splitting MetalSet (80/10/10)..."
     python -m src.data.split_data
 
     echo "Dataset ready."
@@ -239,9 +246,16 @@ train_dscnn() {
 # ─────────────────────────────────────────────────────────────────────
 run_eval() {
     echo ""
-    echo ">>> Evaluating and comparing models..."
+    echo ">>> Experiment 3: Evaluating and comparing models on MetalSet..."
     python -m src.evaluate --compare --output results/comparison.json
-    echo "Evaluation done."
+    echo "MetalSet evaluation done."
+}
+
+run_generalize() {
+    echo ""
+    echo ">>> Experiment 4: Generalization evaluation on StdMetal/StdContact..."
+    python -m src.evaluate --generalize
+    echo "Generalization evaluation done."
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -283,21 +297,27 @@ case "$MODE" in
         activate_env
         run_eval
         ;;
+    generalize)
+        activate_env
+        run_generalize
+        ;;
     all)
         activate_env
         prepare_data
         train_baseline
         train_dscnn
         run_eval
+        run_generalize
         run_visualize
         ;;
     *)
         echo "Usage:"
-        echo "  bash scripts/run_hpc.sh setup     # first time (login node)"
-        echo "  sbatch scripts/run_hpc.sh          # full pipeline (GPU node)"
-        echo "  sbatch scripts/run_hpc.sh baseline # train baseline only"
-        echo "  sbatch scripts/run_hpc.sh dscnn    # train DS-CNN only"
-        echo "  sbatch scripts/run_hpc.sh eval     # evaluate only"
+        echo "  bash scripts/run_hpc.sh setup       # first time (login node)"
+        echo "  sbatch scripts/run_hpc.sh            # full pipeline (GPU node)"
+        echo "  sbatch scripts/run_hpc.sh baseline   # train baseline only"
+        echo "  sbatch scripts/run_hpc.sh dscnn      # train DS-CNN only"
+        echo "  sbatch scripts/run_hpc.sh eval       # Experiment 3: MetalSet comparison"
+        echo "  sbatch scripts/run_hpc.sh generalize # Experiment 4: StdMetal/StdContact"
         exit 1
         ;;
 esac

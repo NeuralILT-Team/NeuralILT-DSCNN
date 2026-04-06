@@ -20,6 +20,7 @@ alias ilt-run='sbatch scripts/run_hpc.sh'
 alias ilt-baseline='sbatch scripts/run_hpc.sh baseline'
 alias ilt-dscnn='sbatch scripts/run_hpc.sh dscnn'
 alias ilt-eval='sbatch scripts/run_hpc.sh eval'
+alias ilt-generalize='sbatch scripts/run_hpc.sh generalize'
 
 # ─── Log viewing ─────────────────────────────────────────────────────
 alias lastlog='ls -t logs/slurm_*.out 2>/dev/null | head -1 | xargs tail -f'

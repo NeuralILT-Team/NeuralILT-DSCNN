@@ -1,8 +1,19 @@
-# Data configuration for LithoBench MetalSet
+# Data configuration for LithoBench
 # Aligned with CMPE 257 project proposal
 
+# Primary dataset (training + in-distribution eval)
 raw_dir: data/raw/MetalSet
 processed_dir: data/processed/MetalSet
+
+# Generalization datasets (out-of-distribution eval only — NOT used for training)
+# Per proposal: StdMetal for generalization, StdContact for cross-domain
+generalization:
+  stdmetal:
+    processed_dir: data/processed/StdMetal
+    raw_dir: data/raw/StdMetal
+  stdcontact:
+    processed_dir: data/processed/StdContact
+    raw_dir: data/raw/StdContact
 
 # Dataset split ratios (proposal: 80/10/10)
 train_ratio: 0.8
