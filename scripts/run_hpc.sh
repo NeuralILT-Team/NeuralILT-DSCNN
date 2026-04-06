@@ -170,10 +170,11 @@ setup_environment() {
     # Install project in editable mode
     pip install -e . 2>/dev/null || echo "  (editable install skipped)"
 
-    # Download dataset (login node has internet)
+    # Download MetalSet only (the main training data, ~2GB from Google Drive)
+    # StdMetal/StdContact are optional and can be downloaded later if needed
     echo ""
-    echo "Downloading LithoBench dataset..."
-    bash scripts/download_data.sh all
+    echo "Downloading LithoBench MetalSet dataset (~2GB)..."
+    bash scripts/download_data.sh MetalSet
 
     # Verify environment
     echo ""

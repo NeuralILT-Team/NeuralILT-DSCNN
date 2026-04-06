@@ -14,7 +14,7 @@ alias killall='scancel -u $USER'
 
 # ─── Quick submit ────────────────────────────────────────────────────
 alias ilt-setup='bash scripts/run_hpc.sh setup'
-alias ilt-download='bash scripts/download_data.sh all'
+alias ilt-download='bash scripts/download_data.sh MetalSet'
 alias ilt-verify='python scripts/verify_env.py'
 alias ilt-validate='python scripts/validate_pipeline.py'
 alias ilt-run='sbatch scripts/run_hpc.sh'

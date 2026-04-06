@@ -148,6 +148,9 @@ download_metalset() {
 download_benchmarks() {
     echo ""
     echo ">>> Downloading StdMetal and StdContact from LithoBench repo..."
+    echo "    NOTE: The LithoBench git repo is large (~15GB with models/kernels)."
+    echo "    We use sparse checkout to only download benchmark/ (~1MB)."
+    echo ""
 
     local TEMP_DIR
     TEMP_DIR=$(mktemp -d)
