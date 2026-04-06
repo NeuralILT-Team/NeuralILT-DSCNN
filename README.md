@@ -136,47 +136,45 @@ The SJSU CoE HPC cluster runs CentOS 7 with GLIBC 2.17. Key constraints:
 - **GPU nodes**: have GPU, no internet
 - **/home is shared** across all nodes
 
-### Step 1: Upload code and data
+### Step 1: Clone and setup (login node — one command)
 
 ```bash
 ssh <your-id>@coe-hpc1.sjsu.edu
-git clone <repo-url>
+git clone -b feature/implement-dscnn-pipeline https://github.com/NeuralILT-Team/NeuralILT-DSCNN.git
 cd NeuralILT-DSCNN
-
-# upload dataset (from local machine)
-scp -r data/raw/MetalSet/ <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/data/raw/
-scp -r data/raw/StdMetal/ <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/data/raw/
+source scripts/hpc_aliases.sh
+ilt-setup
 ```
 
-### Step 2: One-time setup (login node)
+`ilt-setup` handles everything automatically:
+1. Creates venv + installs all dependencies (cached as binary wheels)
+2. Downloads the LithoBench dataset (MetalSet + StdMetal + StdContact)
+3. Verifies all imports work
+
+### Step 2: (Optional) Validate pipeline
 
 ```bash
-bash scripts/run_hpc.sh setup
+ilt-validate    # test full pipeline with synthetic data
 ```
 
-### Step 3: Verify
+### Step 3: Submit jobs
 
 ```bash
-python scripts/verify_env.py
-python scripts/validate_pipeline.py
+ilt-run             # full pipeline (preprocess → train both → eval → analyze)
+
+# or individual steps:
+ilt-baseline        # train baseline only
+ilt-dscnn           # train DS-CNN only
+ilt-eval            # Experiment 3: MetalSet comparison
+ilt-generalize      # Experiment 4: StdMetal/StdContact
+ilt-analyze         # dataset stats + results summary
 ```
 
-### Step 4: Submit jobs
+### Step 4: Monitor and collect
 
 ```bash
-sbatch scripts/run_hpc.sh              # full pipeline
-sbatch scripts/run_hpc.sh baseline     # train baseline only
-sbatch scripts/run_hpc.sh dscnn        # train DS-CNN only
-sbatch scripts/run_hpc.sh eval         # Experiment 3: MetalSet comparison
-sbatch scripts/run_hpc.sh generalize   # Experiment 4: StdMetal/StdContact
-```
-
-### Step 5: Monitor and collect
-
-```bash
-source scripts/hpc_aliases.sh   # load convenience aliases
-myjobs                          # check job status
-lastlog                         # tail latest output
+myjobs              # check job status
+lastlog             # tail latest output
 scp -r <id>@hpc:~/NeuralILT-DSCNN/results/ ./results/
 ```
 
