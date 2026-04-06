@@ -20,6 +20,45 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 
 ---
 
+## Project Status
+
+### What's Done ✅
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| Baseline U-Net | ✅ Complete | 4-level encoder-decoder, BatchNorm, skip connections |
+| DS-CNN U-Net | ✅ Complete | Depthwise separable convolutions, same structure |
+| Data pipeline | ✅ Complete | Preprocessing, augmentation, 80/10/10 split |
+| Training script | ✅ Complete | Config-driven, validation, checkpointing, logging |
+| Evaluation (Exp 3) | ✅ Complete | MSE, SSIM, EPE, FLOPs, params, runtime comparison |
+| Generalization (Exp 4) | ✅ Complete | StdMetal + StdContact out-of-distribution eval |
+| Hyperparameter sweep | ✅ Complete | Sweep LR, features, epochs, batch size |
+| HPC infrastructure | ✅ Complete | SJSU-adapted SLURM scripts, wheel caching |
+| Verification tools | ✅ Complete | verify_env.py, validate_pipeline.py |
+
+### What's Next 🔜
+
+| Step | Priority | Description |
+|------|----------|-------------|
+| **Run experiments on HPC** | 🔴 Critical | Train both models on full MetalSet (16,472 tiles) |
+| **Collect results** | 🔴 Critical | Get MSE/SSIM/EPE/FLOPs numbers for the report |
+| **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
+| **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids |
+| **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
+| **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low |
+| **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
+
+### Experiment Plan (from proposal)
+
+| Experiment | Description | Status |
+|------------|-------------|--------|
+| **Exp 1**: Baseline | Train standard U-Net on MetalSet | Code ready, needs HPC run |
+| **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet | Code ready, needs HPC run |
+| **Exp 3**: Comparison | Compare accuracy + efficiency metrics | Code ready, needs Exp 1+2 |
+| **Exp 4**: Generalization | Evaluate both on StdMetal/StdContact | Code ready, needs Exp 1+2 |
+
+---
+
 ## Project Structure
 
 ```
@@ -27,10 +66,13 @@ NeuralILT-DSCNN/
 ├── configs/
 │   ├── baseline.yaml       # Baseline U-Net config
 │   ├── dscnn.yaml           # DS-CNN U-Net config
-│   └── data.yaml            # Dataset and preprocessing config
+│   └── data.yaml            # Dataset config (MetalSet + generalization sets)
 ├── data/
-│   ├── raw/MetalSet/        # Raw LithoBench data (target/ and litho/)
-│   └── processed/MetalSet/  # Preprocessed layouts/ and masks/
+│   ├── raw/                 # Raw LithoBench data
+│   │   ├── MetalSet/        #   target/ and litho/ (16,472 tiles)
+│   │   ├── StdMetal/        #   target/ and litho/ (271 tiles)
+│   │   └── StdContact/      #   target/ and litho/ (328 tiles)
+│   └── processed/           # Preprocessed (grayscale, normalized)
 ├── docs/
 │   ├── ARCHITECTURE.md      # Architecture and design docs
 │   └── CMPE_257_Project_Proposal_*.pdf
@@ -50,8 +92,8 @@ NeuralILT-DSCNN/
 │   ├── metrics/             # MSE, SSIM, EPE, FLOPs, runtime
 │   ├── models/              # Baseline U-Net and DS-CNN U-Net
 │   ├── utils/               # Seed, checkpointing, logging
-│   ├── train.py             # Training script
-│   ├── evaluate.py          # Evaluation script
+│   ├── train.py             # Training (+ hyperparameter sweep)
+│   ├── evaluate.py          # Evaluation (+ generalization test)
 │   ├── infer.py             # Single-image inference
 │   └── visualize.py         # Plotting utilities
 ├── results/                 # Checkpoints, logs, figures (gitignored)
@@ -62,66 +104,27 @@ NeuralILT-DSCNN/
 
 ---
 
-## Local Setup
-
-### 1. Environment
+## Quick Start (Local)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+# setup
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-### 2. Dataset
-
-Download the LithoBench MetalSet and place it at:
-
-```
-data/raw/MetalSet/
-  ├── target/    # input layout tiles
-  └── litho/     # ground truth mask tiles
-```
-
-### 3. Preprocessing
-
-```bash
-python -m src.data.preprocess
+# preprocess (use MAX_SAMPLES=5000 for local dev)
+MAX_SAMPLES=5000 python -m src.data.preprocess --dataset MetalSet
 python -m src.data.split_data
-```
 
-For local development with a smaller subset:
-```bash
-MAX_SAMPLES=5000 python -m src.data.preprocess
-```
-
----
-
-## Training
-
-```bash
-# Baseline U-Net
+# train
 python -m src.train --config configs/baseline.yaml
-
-# DS-CNN U-Net (proposed)
 python -m src.train --config configs/dscnn.yaml
-```
 
-## Evaluation
-
-```bash
-# Compare both models
+# evaluate
 python -m src.evaluate --compare
 
-# Single model
-python -m src.evaluate --config configs/baseline.yaml \
-    --checkpoint results/checkpoints/baseline/best_model.pt
-```
-
-## Visualization
-
-```bash
-python -m src.visualize --mode curves --log-dir results/logs
-python -m src.visualize --mode efficiency --results results/eval_results.json
+# generalization test
+python -m src.data.preprocess --dataset StdMetal
+python -m src.evaluate --generalize
 ```
 
 ---
@@ -133,100 +136,69 @@ The SJSU CoE HPC cluster runs CentOS 7 with GLIBC 2.17. Key constraints:
 - **GPU nodes**: have GPU, no internet
 - **/home is shared** across all nodes
 
-This means we download pre-built binary wheels on the login node, then run training on GPU nodes using the cached wheels.
-
 ### Step 1: Upload code and data
 
 ```bash
-# SSH into the cluster
 ssh <your-id>@coe-hpc1.sjsu.edu
-
-# Clone the repo
 git clone <repo-url>
 cd NeuralILT-DSCNN
 
-# Upload dataset (from your local machine)
+# upload dataset (from local machine)
 scp -r data/raw/MetalSet/ <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/data/raw/
+scp -r data/raw/StdMetal/ <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/data/raw/
 ```
 
-### Step 2: One-time setup (on login node)
+### Step 2: One-time setup (login node)
 
 ```bash
-# This downloads all wheels and creates the venv
-# Must run on login node (has internet)
 bash scripts/run_hpc.sh setup
 ```
 
-This will:
-1. Create a venv at `./venv/`
-2. Download PyTorch CUDA wheels (~2GB) to `.wheels/`
-3. Install all dependencies from cached wheels
-4. Install the project in editable mode
-
-### Step 3: Verify environment
+### Step 3: Verify
 
 ```bash
-# Check all imports work
 python scripts/verify_env.py
-
-# Test the full pipeline with synthetic data
 python scripts/validate_pipeline.py
 ```
 
 ### Step 4: Submit jobs
 
 ```bash
-# Full pipeline (preprocess → train both → evaluate → plot)
-sbatch scripts/run_hpc.sh
-
-# Or individual steps
-sbatch scripts/run_hpc.sh preprocess
-sbatch scripts/run_hpc.sh baseline
-sbatch scripts/run_hpc.sh dscnn
-sbatch scripts/run_hpc.sh eval
+sbatch scripts/run_hpc.sh              # full pipeline
+sbatch scripts/run_hpc.sh baseline     # train baseline only
+sbatch scripts/run_hpc.sh dscnn        # train DS-CNN only
+sbatch scripts/run_hpc.sh eval         # Experiment 3: MetalSet comparison
+sbatch scripts/run_hpc.sh generalize   # Experiment 4: StdMetal/StdContact
 ```
 
-### Step 5: Monitor and collect results
+### Step 5: Monitor and collect
 
 ```bash
-# Check job status
-squeue -u $USER
-
-# Tail the latest log
-tail -f logs/slurm_*.out
-
-# Copy results to local machine
-scp -r <your-id>@coe-hpc1.sjsu.edu:~/NeuralILT-DSCNN/results/ ./results/
+source scripts/hpc_aliases.sh   # load convenience aliases
+myjobs                          # check job status
+lastlog                         # tail latest output
+scp -r <id>@hpc:~/NeuralILT-DSCNN/results/ ./results/
 ```
 
-### HPC convenience aliases
+---
+
+## Hyperparameter Sweep
+
+If initial results need tuning, use the built-in sweep support:
 
 ```bash
-# Load aliases (or add to ~/.bashrc)
-source scripts/hpc_aliases.sh
+# sweep learning rates
+python -m src.train --config configs/dscnn.yaml --sweep-lr 1e-3 5e-4 1e-4 5e-5
 
-# Then use shortcuts:
-ilt-setup       # one-time setup
-ilt-verify      # check environment
-ilt-validate    # test pipeline
-ilt-run         # submit full pipeline
-ilt-baseline    # train baseline only
-ilt-dscnn       # train DS-CNN only
-lastlog         # tail latest output
-gpunode         # get interactive GPU session
+# sweep channel widths (try wider DS-CNN to recover accuracy)
+python -m src.train --config configs/dscnn.yaml \
+    --sweep-features "32,64" "64,128,256,512" "96,192,384,768"
+
+# sweep epochs
+python -m src.train --config configs/dscnn.yaml --sweep-epochs 25 50 100
 ```
 
-### SLURM job defaults
-
-| Setting | Value |
-|---------|-------|
-| Partition | `gpu` |
-| GPUs | 1 |
-| CPUs | 4 |
-| Memory | 32 GB |
-| Time limit | 12 hours |
-
-Edit the `#SBATCH` directives in `scripts/run_hpc.sh` if needed.
+Each sweep value gets its own checkpoint and log directory. A summary table is printed at the end ranking by validation loss.
 
 ---
 
@@ -234,20 +206,20 @@ Edit the `#SBATCH` directives in `scripts/run_hpc.sh` if needed.
 
 ### Accuracy Metrics
 
-| Metric | Description |
-|--------|-------------|
-| **MSE** | Mean Squared Error — pixel-level difference |
-| **SSIM** | Structural Similarity Index — perceptual similarity |
-| **EPE** | Edge Placement Error — mask edge distance (pixels) |
+| Metric | Description | Goal |
+|--------|-------------|------|
+| **MSE** | Pixel-level difference | Lower is better |
+| **SSIM** | Structural similarity (edges, contrast) | Higher is better (target: within 2-5% of baseline) |
+| **EPE** | Edge placement error in pixels | Lower is better |
 
 ### Efficiency Metrics
 
-| Metric | Description |
-|--------|-------------|
-| **Parameters** | Total trainable parameters |
-| **FLOPs** | Floating-point operations per forward pass |
-| **Runtime** | GPU inference time (ms) |
-| **Memory** | Peak GPU memory (MB) |
+| Metric | Description | Expected |
+|--------|-------------|----------|
+| **Parameters** | Trainable parameter count | DS-CNN should have ~8× fewer |
+| **FLOPs** | Operations per forward pass | DS-CNN should have ~8× fewer |
+| **Runtime** | GPU inference time (ms) | DS-CNN should be 2-4× faster |
+| **Memory** | Peak GPU memory (MB) | DS-CNN should use less |
 
 ---
 
@@ -257,6 +229,43 @@ Edit the `#SBATCH` directives in `scripts/run_hpc.sh` if needed.
 2. **BatchNorm after every conv**: Stabilizes training for both architectures.
 3. **No photometric augmentation**: Pixel values have physical meaning in lithography.
 4. **Fixed random seed (42)**: Reproducible data splits and training.
+5. **Generalization test**: StdMetal (271 tiles) never seen during training — tests if fewer params reduce overfitting.
+
+---
+
+## What You Can Learn From This Experiment
+
+### Core Questions This Project Answers
+
+1. **Efficiency vs accuracy tradeoff**: How much accuracy do you lose when you replace standard convolutions with depthwise separable ones? Is the ~8× FLOPs reduction worth it?
+
+2. **Theoretical vs practical speedup**: The math says ~8× fewer FLOPs, but does that translate to 8× faster inference? (Usually not — memory bandwidth, kernel launch overhead, and GPU utilization all matter.)
+
+3. **Generalization and overfitting**: Does a model with fewer parameters generalize better to unseen data (StdMetal)? The proposal hypothesizes yes — this experiment tests it.
+
+### Additional Experiments to Explore
+
+If you want to go deeper, here are ideas that build on the current codebase:
+
+#### A. Architecture Variants
+- **Hybrid model**: Use standard convolutions in the first encoder level (where channels are small and DS-Conv savings are minimal) and DS-Conv everywhere else. This might give the best of both worlds.
+- **Width multiplier**: MobileNet uses a width multiplier α to uniformly scale channel counts. Try α = 0.5, 0.75, 1.0, 1.25 to map the accuracy-efficiency Pareto frontier.
+- **Inverted residuals**: MobileNetV2 uses inverted residual blocks (expand → depthwise → project). These could further improve DS-CNN accuracy.
+
+#### B. Training Improvements
+- **SSIM loss**: The codebase has MSE loss, but adding SSIM as a loss component (already partially implemented in `mse_loss.py`) could improve structural fidelity of predictions.
+- **Learning rate warmup**: Start with a low LR for the first few epochs, then ramp up. This often helps with BatchNorm-heavy architectures.
+- **Data augmentation ablation**: Disable augmentation and compare — does it help or hurt for this specific dataset?
+
+#### C. Analysis Deep Dives
+- **Per-tile difficulty analysis**: Some MetalSet tiles have more complex optical proximity effects than others. Do both models struggle on the same tiles, or does DS-CNN fail on different ones?
+- **Edge analysis**: Look at EPE broken down by edge type (horizontal, vertical, diagonal, curved). DS-Conv might handle some edge orientations differently.
+- **Layer-wise FLOPs breakdown**: Which encoder/decoder levels contribute most to the FLOPs difference? This tells you where DS-Conv matters most.
+- **Activation visualization**: Compare intermediate feature maps between baseline and DS-CNN to understand what each model "sees" differently.
+
+#### D. Scaling Experiments
+- **ViaSet training**: The LithoBench ViaSet has 116,415 tiles (7× more than MetalSet). Training on this larger dataset would test if DS-CNN's efficiency advantage grows with dataset size.
+- **Batch size scaling**: With less memory per forward pass, DS-CNN can use larger batch sizes. Does this improve training speed or final accuracy?
 
 ---
 
@@ -264,3 +273,5 @@ Edit the `#SBATCH` directives in `scripts/run_hpc.sh` if needed.
 
 1. S. Zheng et al., "LithoBench: Benchmarking AI Computational Lithography for Semiconductor Manufacturing," NeurIPS 2023.
 2. A. G. Howard et al., "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications," arXiv:1704.04861, 2017.
+3. M. Sandler et al., "MobileNetV2: Inverted Residuals and Linear Bottlenecks," CVPR 2018.
+4. C. A. Mack, "Fundamental Principles of Optical Lithography," Wiley, 2007.
