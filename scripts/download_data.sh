@@ -117,9 +117,44 @@ download_metalset() {
         return 1
     fi
 
+    # Verify the file is actually a tarball (not an HTML error page)
+    local file_type
+    file_type=$(file "$tarball" 2>/dev/null || echo "unknown")
+    echo "File type: $file_type"
+
+    if echo "$file_type" | grep -qi "html\|text\|ASCII"; then
+        echo ""
+        echo "ERROR: Downloaded file is HTML, not a tarball."
+        echo "This usually means Google Drive served a confirmation page."
+        echo ""
+        echo "Fix: install gdown and retry:"
+        echo "  pip install gdown"
+        echo "  rm ${tarball}"
+        echo "  bash scripts/download_data.sh MetalSet"
+        echo ""
+        echo "Or download manually:"
+        echo "  1. Open: https://drive.google.com/file/d/${GDRIVE_FILE_ID}/view"
+        echo "  2. Click 'Download'"
+        echo "  3. Upload: scp lithodata.tar.gz <user>@hpc:~/NeuralILT-DSCNN/${DATA_DIR}/"
+        echo "  4. Run: bash scripts/download_data.sh extract"
+        rm -f "$tarball"
+        return 1
+    fi
+
+    local file_size
+    file_size=$(stat -f%z "$tarball" 2>/dev/null || stat -c%s "$tarball" 2>/dev/null || echo "0")
+    echo "File size: $(echo "$file_size / 1048576" | bc 2>/dev/null || echo "$file_size") MB"
+
     echo ""
-    echo "Extracting lithodata.tar.gz..."
-    tar xzf "$tarball" -C "$DATA_DIR/"
+    echo "Extracting lithodata.tar.gz (this may take a while for ~15GB)..."
+    if ! tar xzf "$tarball" -C "$DATA_DIR/"; then
+        echo ""
+        echo "ERROR: Extraction failed. The tarball may be corrupted."
+        echo "Try re-downloading:"
+        echo "  rm ${tarball}"
+        echo "  bash scripts/download_data.sh MetalSet"
+        return 1
+    fi
 
     # The tarball may extract to different structures — find MetalSet
     if [ ! -d "${DATA_DIR}/MetalSet" ]; then
