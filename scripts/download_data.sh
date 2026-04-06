@@ -146,8 +146,18 @@ download_metalset() {
     echo "File size: $(echo "$file_size / 1048576" | bc 2>/dev/null || echo "$file_size") MB"
 
     echo ""
-    echo "Extracting lithodata.tar.gz (this may take a while for ~15GB)..."
-    if ! tar xzf "$tarball" -C "$DATA_DIR/"; then
+    echo "Extracting lithodata.tar.gz (this may take 15-30 min for ~15GB)..."
+
+    # Use pv for progress bar if available, otherwise verbose tar
+    if command -v pv &>/dev/null; then
+        pv "$tarball" | tar xzf - -C "$DATA_DIR/"
+    else
+        echo "  (install 'pv' for a progress bar: sudo apt install pv)"
+        echo "  Using verbose mode — printing every 1000th file..."
+        tar xzvf "$tarball" -C "$DATA_DIR/" 2>&1 | awk 'NR % 1000 == 0 {print "  " NR " files extracted..."}'
+    fi
+
+    if [ $? -ne 0 ]; then
         echo ""
         echo "ERROR: Extraction failed. The tarball may be corrupted."
         echo "Try re-downloading:"
