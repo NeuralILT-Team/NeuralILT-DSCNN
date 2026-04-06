@@ -146,38 +146,29 @@ download_metalset() {
     echo "File size: $(echo "$file_size / 1048576" | bc 2>/dev/null || echo "$file_size") MB"
 
     echo ""
-    echo "Extracting ONLY MetalSet from lithodata.tar.gz..."
-    echo "  (skipping ViaSet and other subsets to save disk space)"
+    echo "Extracting MetalSet/target and MetalSet/litho from tarball..."
+    echo "  (skipping ViaSet, gds, glp, resist, printed, levelsetILT)"
     echo ""
 
-    # First, find the MetalSet path inside the tarball
-    echo "  Scanning tarball for MetalSet path..."
-    local metalset_path
-    metalset_path=$(tar tzf "$tarball" | grep -m1 "MetalSet" | cut -d'/' -f1-2)
+    # Find the MetalSet path prefix inside the tarball
+    echo "  Scanning tarball structure..."
+    local metalset_prefix
+    metalset_prefix=$(tar tzf "$tarball" | grep -m1 "MetalSet/target/" | sed 's|MetalSet/target/.*|MetalSet|')
 
-    if [ -z "$metalset_path" ]; then
-        # try broader search
-        metalset_path=$(tar tzf "$tarball" | grep -i "metal" | head -1 | cut -d'/' -f1-2)
-    fi
+    if [ -n "$metalset_prefix" ]; then
+        echo "  Found: ${metalset_prefix}/target/ and ${metalset_prefix}/litho/"
+        echo "  Extracting only target + litho (this takes a few minutes)..."
 
-    if [ -n "$metalset_path" ]; then
-        echo "  Found MetalSet at: ${metalset_path}"
-        echo "  Extracting (this takes a few minutes)..."
-
-        # Extract only MetalSet — much faster and smaller than full extraction
-        if command -v pv &>/dev/null; then
-            pv "$tarball" | tar xzf - -C "$DATA_DIR/" --wildcards "*MetalSet*"
-        else
-            tar xzvf "$tarball" -C "$DATA_DIR/" --wildcards "*MetalSet*" 2>&1 | \
-                awk 'NR % 500 == 0 {print "  " NR " files extracted..."}'
-        fi
+        # Extract ONLY target/ and litho/ from MetalSet
+        tar xzvf "$tarball" -C "$DATA_DIR/" \
+            "${metalset_prefix}/target" \
+            "${metalset_prefix}/litho" \
+            2>&1 | awk 'NR % 500 == 0 {print "  " NR " files extracted..."}'
     else
-        echo "  WARNING: Could not find MetalSet path in tarball."
-        echo "  Listing tarball contents:"
-        tar tzf "$tarball" | head -30
-        echo ""
-        echo "  Extracting everything (this will take longer)..."
-        tar xzf "$tarball" -C "$DATA_DIR/"
+        echo "  Could not find exact path. Trying wildcard extraction..."
+        tar xzvf "$tarball" -C "$DATA_DIR/" --wildcards \
+            '*MetalSet/target*' '*MetalSet/litho*' \
+            2>&1 | awk 'NR % 500 == 0 {print "  " NR " files extracted..."}'
     fi
 
     if [ $? -ne 0 ]; then
@@ -282,10 +273,23 @@ extract_tarball() {
         echo "Upload it first: scp lithodata.tar.gz <user>@hpc:~/NeuralILT-DSCNN/${DATA_DIR}/"
         return 1
     fi
-    echo "Extracting ONLY MetalSet from ${tarball}..."
-    echo "  (skipping ViaSet and other subsets to save disk space)"
-    tar xzvf "$tarball" -C "$DATA_DIR/" --wildcards '*MetalSet*' 2>&1 | \
-        awk 'NR % 500 == 0 {print "  " NR " files..."}'
+    echo "Extracting MetalSet/target and MetalSet/litho from ${tarball}..."
+    echo "  (skipping gds, glp, resist, printed, levelsetILT, ViaSet)"
+
+    # Find the path prefix
+    local metalset_prefix
+    metalset_prefix=$(tar tzf "$tarball" | grep -m1 "MetalSet/target/" | sed 's|MetalSet/target/.*|MetalSet|')
+
+    if [ -n "$metalset_prefix" ]; then
+        tar xzvf "$tarball" -C "$DATA_DIR/" \
+            "${metalset_prefix}/target" \
+            "${metalset_prefix}/litho" \
+            2>&1 | awk 'NR % 500 == 0 {print "  " NR " files..."}'
+    else
+        tar xzvf "$tarball" -C "$DATA_DIR/" --wildcards \
+            '*MetalSet/target*' '*MetalSet/litho*' \
+            2>&1 | awk 'NR % 500 == 0 {print "  " NR " files..."}'
+    fi
 
     # Find and move MetalSet if needed
     if [ ! -d "${DATA_DIR}/MetalSet" ]; then
