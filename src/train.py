@@ -50,7 +50,7 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, grad_clip=0.0,
 
         # mixed precision forward pass
         if scaler is not None:
-            with torch.amp.autocast('cuda'):
+            with torch.cuda.amp.autocast():
                 preds = model(layouts)
                 loss = loss_fn(preds, masks) / accum_steps
             scaler.scale(loss).backward()
@@ -92,7 +92,7 @@ def validate(model, loader, loss_fn, device, use_amp=False):
         layouts, masks = layouts.to(device), masks.to(device)
 
         if use_amp:
-            with torch.amp.autocast('cuda'):
+            with torch.cuda.amp.autocast():
                 preds = model(layouts)
                 total_loss += loss_fn(preds, masks).item()
             # metrics in float32 for accuracy
@@ -156,7 +156,7 @@ def train(config, run_name=None):
     # mixed precision + gradient accumulation
     use_amp = train_cfg.get("mixed_precision", False) and device.type == 'cuda'
     accum_steps = train_cfg.get("grad_accumulation", 1)
-    scaler = torch.amp.GradScaler('cuda') if use_amp else None
+    scaler = torch.cuda.amp.GradScaler() if use_amp else None
 
     if use_amp:
         print(f"Mixed precision: ON (float16)")
