@@ -2,16 +2,17 @@
 # Proposed efficient architecture per CMPE 257 project proposal
 #
 # SJSU HPC GPU: 12GB VRAM — DS-CNN uses less memory than baseline
+# Same features/batch as baseline for fair comparison.
 
 model:
   name: dscnn
   in_channels: 1
   out_channels: 1
-  features: [64, 128, 256, 512]  # Same depth as baseline for fair comparison
+  features: [32, 64, 128, 256]  # same as baseline for fair comparison
 
 training:
   epochs: 50
-  batch_size: 4           # same as baseline for fair comparison
+  batch_size: 2           # same as baseline for fair comparison
   learning_rate: 1.0e-4
   weight_decay: 0.0
   optimizer: adam
@@ -21,7 +22,7 @@ training:
   loss: mse
   grad_clip: 1.0
   mixed_precision: true   # use float16 to halve memory
-  grad_accumulation: 4    # effective batch size = 4 * 4 = 16
+  grad_accumulation: 8    # effective batch size = 2 * 8 = 16
 
 # Checkpoint and logging
 checkpoint_dir: results/checkpoints/dscnn

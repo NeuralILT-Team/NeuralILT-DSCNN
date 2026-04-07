@@ -156,6 +156,64 @@ def test_config_loading():
     print(f'         model: {merged["model"]["name"]}, features: {merged["model"].get("features")}')
 
 
+def test_gpu_memory_estimate():
+    """Estimate GPU memory usage to catch OOM before submitting jobs.
+
+    Does a dummy forward+backward pass and measures peak memory.
+    Only runs if CUDA is available.
+    """
+    import torch
+    if not torch.cuda.is_available():
+        print('         No GPU — skipping memory estimate (OK on login node)')
+        return
+
+    from src.models.common import build_model
+    from src.utils.io import load_config, merge_configs
+
+    gpu_mem = torch.cuda.get_device_properties(0).total_mem / 1e9
+    print(f'         GPU: {torch.cuda.get_device_name(0)} ({gpu_mem:.1f} GB)')
+
+    for cfg_path in ['configs/baseline.yaml', 'configs/dscnn.yaml']:
+        model_cfg = load_config(cfg_path)
+        data_cfg = load_config('configs/data.yaml')
+        config = merge_configs(data_cfg, model_cfg)
+
+        model_name = config['model']['name']
+        bs = config.get('training', {}).get('batch_size', 2)
+        features = config['model'].get('features', [32, 64, 128, 256])
+        use_amp = config.get('training', {}).get('mixed_precision', False)
+
+        model = build_model(config).cuda()
+        x = torch.randn(bs, 1, 256, 256, device='cuda')
+
+        torch.cuda.reset_peak_memory_stats()
+
+        # simulate one training step
+        if use_amp:
+            with torch.cuda.amp.autocast():
+                y = model(x)
+                loss = y.mean()
+            loss.backward()
+        else:
+            y = model(x)
+            loss = y.mean()
+            loss.backward()
+
+        peak_gb = torch.cuda.max_memory_allocated() / 1e9
+        headroom = gpu_mem - peak_gb
+        status = "OK" if headroom > 1.0 else "TIGHT" if headroom > 0 else "OOM!"
+        print(f'         {model_name} (bs={bs}, feat={features}, amp={use_amp}): '
+              f'{peak_gb:.1f} GB peak, {headroom:.1f} GB headroom [{status}]')
+
+        assert headroom > 0, (
+            f'{model_name} will OOM! Peak {peak_gb:.1f} GB > GPU {gpu_mem:.1f} GB. '
+            f'Reduce batch_size or features in {cfg_path}')
+
+        # cleanup
+        del model, x, y, loss
+        torch.cuda.empty_cache()
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("NeuralILT-DSCNN — Pipeline Validation")
@@ -188,6 +246,9 @@ if __name__ == '__main__':
 
     print("\n--- Config loading ---")
     step("load and merge YAML configs", test_config_loading)
+
+    print("\n--- GPU memory estimate ---")
+    step("memory fits on GPU", test_gpu_memory_estimate)
 
     print("\n" + "=" * 60)
     print(f"Results: {PASS} passed, {FAIL} failed")

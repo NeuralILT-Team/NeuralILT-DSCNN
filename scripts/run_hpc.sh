@@ -82,6 +82,9 @@ activate_env() {
     # project root on PYTHONPATH so 'import src' works
     export PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH:-}"
 
+    # Help PyTorch manage GPU memory fragmentation on small GPUs
+    export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
     # GPU check
     echo ""
     echo "--- PyTorch Backend Check ---"
