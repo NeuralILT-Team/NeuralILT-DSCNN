@@ -128,6 +128,13 @@ def train(config, run_name=None):
     train_loader, val_loader, _ = get_dataloaders(config, batch_size=bs)
     print(f"Train: {len(train_loader.dataset)} samples, Val: {len(val_loader.dataset)} samples")
 
+    # sanity check: log actual image dimensions (catches 2048x2048 OOM issue)
+    sample_layout, sample_mask = train_loader.dataset[0]
+    print(f"Image size: {sample_layout.shape} (should be [1, 256, 256])")
+    if sample_layout.shape[-1] > 512:
+        print(f"WARNING: images are {sample_layout.shape[-1]}x{sample_layout.shape[-2]}!")
+        print(f"         This will OOM. Re-run preprocessing: python -m src.data.preprocess")
+
     # model
     model = build_model(config).to(device)
     model_name = config.get("model", {}).get("name", "unknown")

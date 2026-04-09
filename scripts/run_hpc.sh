@@ -196,17 +196,30 @@ prepare_data() {
     echo ""
     echo ">>> Preparing dataset..."
 
-    # Check if already processed (skip everything if so)
+    # Check if already processed AND images are the right size (256x256).
+    # LithoBench tiles are 2048x2048 natively — if we find large images,
+    # we need to re-preprocess to resize them.
+    NEED_REPROCESS=false
     if [ -d "data/processed/MetalSet/layouts" ] && [ -d "data/processed/MetalSet/masks" ]; then
         n=$(ls data/processed/MetalSet/layouts/ 2>/dev/null | wc -l)
         if [ "$n" -gt 0 ]; then
-            echo "[OK] Processed data already exists (${n} tiles) — skipping"
-            # still ensure split exists
-            if [ ! -f "data/processed/MetalSet/splits.json" ]; then
-                echo "Generating splits..."
-                python -m src.data.split_data
+            # check if images are already 256x256
+            sample=$(ls data/processed/MetalSet/layouts/ | head -1)
+            img_size=$(python -c "from PIL import Image; print(Image.open('data/processed/MetalSet/layouts/$sample').size[0])" 2>/dev/null || echo "0")
+            if [ "$img_size" = "256" ]; then
+                echo "[OK] Processed data exists (${n} tiles, ${img_size}x${img_size}) — skipping"
+                if [ ! -f "data/processed/MetalSet/splits.json" ]; then
+                    echo "Generating splits..."
+                    python -m src.data.split_data
+                fi
+                return 0
+            else
+                echo "[WARN] Processed images are ${img_size}x${img_size}, need 256x256"
+                echo "       Re-preprocessing to resize..."
+                NEED_REPROCESS=true
+                # remove old processed data and splits
+                rm -rf data/processed/MetalSet
             fi
-            return 0
         fi
     fi
 

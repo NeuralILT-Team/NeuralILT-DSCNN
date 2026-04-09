@@ -35,10 +35,16 @@ DATASETS = {
 
 MAX_SAMPLES = int(os.getenv("MAX_SAMPLES", -1))
 
+# LithoBench tiles are 2048x2048 — way too large for a U-Net on 12GB GPU.
+# Resize to 256x256 during preprocessing so we don't have to do it every epoch.
+TARGET_SIZE = int(os.getenv("TILE_SIZE", 256))
 
-def process_and_save_image(input_path, output_path):
-    """Convert to grayscale, normalize, save."""
+
+def process_and_save_image(input_path, output_path, target_size=TARGET_SIZE):
+    """Convert to grayscale, resize to target_size, save."""
     image = Image.open(input_path).convert("L")
+    if image.size[0] != target_size or image.size[1] != target_size:
+        image = image.resize((target_size, target_size), Image.BILINEAR)
     array = np.array(image, dtype=np.float32) / 255.0
     output = (array * 255).astype(np.uint8)
     Image.fromarray(output).save(output_path)
