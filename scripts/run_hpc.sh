@@ -28,7 +28,10 @@
 #   - Setup downloads pre-built wheels on login node (no compilation)
 #   - Batch jobs use the venv created during setup
 
-set -euo pipefail
+# NOTE: not using 'set -euo pipefail' because it causes silent failures
+# when optional commands fail (e.g., PIL check, module load). We handle
+# errors explicitly instead.
+set -o pipefail
 
 # ─────────────────────────────────────────────────────────────────────
 # CONFIG
@@ -85,19 +88,25 @@ activate_env() {
     # Help PyTorch manage GPU memory fragmentation on small GPUs
     export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
-    # GPU check
+    # GPU check — show actual errors so we can debug import failures
     echo ""
     echo "--- PyTorch Backend Check ---"
+    echo "  Python: $(which python)"
     python -c "
 import torch
 print(f'  PyTorch: {torch.__version__}')
 print(f'  CUDA available: {torch.cuda.is_available()}')
 if torch.cuda.is_available():
     print(f'  GPU: {torch.cuda.get_device_name(0)}')
-    print(f'  Memory: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+    mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+    print(f'  Memory: {mem_gb:.1f} GB')
 else:
     print('  WARNING: No GPU detected. Training will be slow.')
-" 2>/dev/null || echo "  WARNING: PyTorch import failed"
+" || {
+    echo "  WARNING: PyTorch import failed. Showing error:"
+    python -c "import torch" 2>&1 | head -5
+    echo "  Check that venv was set up correctly: bash scripts/run_hpc.sh setup"
+}
     echo "-----------------------------"
     echo ""
 }
@@ -246,8 +255,13 @@ prepare_data() {
     echo "Found $n_target target tiles, $n_litho litho tiles"
 
     # preprocess MetalSet (primary training data)
-    echo "Preprocessing MetalSet..."
-    python -m src.data.preprocess --dataset MetalSet
+    echo "Preprocessing MetalSet (resizing to 256x256)..."
+    python -m src.data.preprocess --dataset MetalSet || {
+        echo "ERROR: Preprocessing failed!"
+        echo "Check that data/raw/MetalSet/target/ and data/raw/MetalSet/litho/ exist"
+        ls -la data/raw/MetalSet/ 2>/dev/null || echo "  data/raw/MetalSet/ does not exist"
+        exit 1
+    }
 
     # preprocess generalization datasets if available
     python -m src.data.preprocess --dataset StdMetal 2>/dev/null || true
@@ -255,7 +269,10 @@ prepare_data() {
 
     # split MetalSet into train/val/test
     echo "Splitting MetalSet (80/10/10)..."
-    python -m src.data.split_data
+    python -m src.data.split_data || {
+        echo "ERROR: Split generation failed!"
+        exit 1
+    }
 
     echo "Dataset ready."
 }
