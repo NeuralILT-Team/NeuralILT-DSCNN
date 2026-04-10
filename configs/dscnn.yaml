@@ -10,8 +10,7 @@ model:
   out_channels: 1
   features: [64, 128, 256, 512]  # same depth as baseline for fair comparison
 
-# images are resized to this during loading (safety net)
-image_size: 256
+# image_size is in configs/data.yaml (single source of truth)
 
 training:
   epochs: 50

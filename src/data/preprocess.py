@@ -7,7 +7,8 @@ Handles multiple dataset subsets:
   - StdContact (328 tiles) — optional cross-domain test
 
 Each subset has target/ (layouts) and litho/ (masks) subdirectories.
-This script converts them to grayscale and saves to data/processed/.
+This script converts them to grayscale, resizes to image_size (from
+configs/data.yaml), and saves to data/processed/.
 
 Run:
     python -m src.data.preprocess                    # MetalSet only
@@ -21,10 +22,12 @@ from pathlib import Path
 import os
 import random
 import numpy as np
+import yaml
 from PIL import Image
 
 RAW_DIR = Path("data/raw")
 PROCESSED_BASE = Path("data/processed")
+DATA_CONFIG = Path("configs/data.yaml")
 
 # all LithoBench subsets we support
 DATASETS = {
@@ -35,13 +38,20 @@ DATASETS = {
 
 MAX_SAMPLES = int(os.getenv("MAX_SAMPLES", -1))
 
-# LithoBench tiles are 2048x2048 — way too large for a U-Net on 12GB GPU.
-# Resize to 256x256 during preprocessing so we don't have to do it every epoch.
-TARGET_SIZE = int(os.getenv("TILE_SIZE", 256))
+
+def get_image_size():
+    """Read image_size from configs/data.yaml (single source of truth)."""
+    if DATA_CONFIG.exists():
+        with open(DATA_CONFIG) as f:
+            cfg = yaml.safe_load(f)
+        return cfg.get("image_size", 256)
+    return 256
 
 
-def process_and_save_image(input_path, output_path, target_size=TARGET_SIZE):
+def process_and_save_image(input_path, output_path, target_size=None):
     """Convert to grayscale, resize to target_size, save."""
+    if target_size is None:
+        target_size = get_image_size()
     image = Image.open(input_path).convert("L")
     if image.size[0] != target_size or image.size[1] != target_size:
         image = image.resize((target_size, target_size), Image.BILINEAR)
@@ -50,8 +60,11 @@ def process_and_save_image(input_path, output_path, target_size=TARGET_SIZE):
     Image.fromarray(output).save(output_path)
 
 
-def preprocess_dataset(dataset_name, max_samples=-1):
+def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
     """Preprocess a single dataset subset."""
+    if image_size is None:
+        image_size = get_image_size()
+
     raw_path = RAW_DIR / dataset_name
     out_dir = PROCESSED_BASE / dataset_name
 
@@ -68,6 +81,12 @@ def preprocess_dataset(dataset_name, max_samples=-1):
     if not mask_dir.exists():
         print(f"[SKIP] {dataset_name}: no litho/ directory")
         return 0
+
+    # log what we're doing
+    sample = next(layout_dir.iterdir(), None)
+    if sample:
+        orig = Image.open(sample).size
+        print(f"[INFO] {dataset_name}: original size {orig[0]}x{orig[1]} -> resizing to {image_size}x{image_size}")
 
     # create output dirs
     (out_dir / "layouts").mkdir(parents=True, exist_ok=True)
@@ -90,15 +109,17 @@ def preprocess_dataset(dataset_name, max_samples=-1):
             skipped += 1
             continue
 
-        process_and_save_image(layout_path, out_dir / "layouts" / layout_path.name)
+        process_and_save_image(layout_path, out_dir / "layouts" / layout_path.name,
+                               target_size=image_size)
         process_and_save_image(mask_dir / layout_path.name,
-                               out_dir / "masks" / layout_path.name)
+                               out_dir / "masks" / layout_path.name,
+                               target_size=image_size)
         processed += 1
 
         if processed % 500 == 0:
             print(f"[INFO] {dataset_name}: processed {processed} pairs")
 
-    print(f"[DONE] {dataset_name}: {processed} processed, {skipped} skipped")
+    print(f"[DONE] {dataset_name}: {processed} processed, {skipped} skipped (output: {image_size}x{image_size})")
     return processed
 
 
@@ -110,14 +131,17 @@ def main():
                         help="Preprocess all available datasets")
     args = parser.parse_args()
 
+    image_size = get_image_size()
+    print(f"Image size: {image_size}x{image_size} (from {DATA_CONFIG})")
+
     if args.all:
         print("Preprocessing all available datasets...")
         total = 0
         for name in DATASETS:
-            total += preprocess_dataset(name, MAX_SAMPLES)
+            total += preprocess_dataset(name, MAX_SAMPLES, image_size=image_size)
         print(f"\nTotal: {total} pairs processed across all datasets")
     else:
-        preprocess_dataset(args.dataset, MAX_SAMPLES)
+        preprocess_dataset(args.dataset, MAX_SAMPLES, image_size=image_size)
 
     print("\nPreprocessing complete.")
 
