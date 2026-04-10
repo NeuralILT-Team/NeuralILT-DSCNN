@@ -31,8 +31,9 @@ alias alllogs='ls -lt logs/slurm_*.out 2>/dev/null | head -10'
 alias clearlogs='rm -f logs/slurm_*.out logs/slurm_*.err && echo "Logs cleared"'
 
 # ─── Cleanup ─────────────────────────────────────────────────────────
+alias cleandata='rm -rf data/processed/MetalSet data/processed/StdMetal data/processed/StdContact && echo "Processed data deleted. Will re-preprocess on next run."'
 alias cleanvenv='rm -rf venv && echo "venv deleted. Run ilt-setup to recreate."'
-alias cleanall='rm -rf venv .wheels logs/slurm_* && echo "Cleaned venv, wheels, and logs"'
+alias cleanall='rm -rf venv .wheels logs/slurm_* data/processed && echo "Cleaned venv, wheels, logs, and processed data"'
 
 # ─── Results ─────────────────────────────────────────────────────────
 alias results='ls -la results/ 2>/dev/null'

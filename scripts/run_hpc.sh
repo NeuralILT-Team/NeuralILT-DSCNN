@@ -10,6 +10,10 @@
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
 #
+# Email notifications (override with: sbatch --mail-user=other@sjsu.edu ...)
+#SBATCH --mail-type=END,FAIL,TIME_LIMIT
+#SBATCH --mail-user=pramod.yadav@sjsu.edu
+#
 # NeuralILT-DSCNN — SJSU CoE HPC Experiment Runner
 #
 # FIRST TIME SETUP (run on the login node — has internet):
