@@ -42,8 +42,9 @@ def check_torch_cuda():
         import torch
         if torch.cuda.is_available():
             gpu = torch.cuda.get_device_name(0)
-            mem = torch.cuda.get_device_properties(0).total_mem / 1e9
-            print(f"  OK   {'torch.cuda':<30s} GPU: {gpu} ({mem:.1f} GB)")
+            props = torch.cuda.get_device_properties(0)
+            mem = getattr(props, 'total_memory', None) or getattr(props, 'total_mem', 0)
+            print(f"  OK   {'torch.cuda':<30s} GPU: {gpu} ({mem / 1e9:.1f} GB)")
         else:
             print(f"  WARN {'torch.cuda':<30s} No GPU (OK on login node, needed on GPU node)")
         PASS += 1

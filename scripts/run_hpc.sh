@@ -98,13 +98,15 @@ print(f'  PyTorch: {torch.__version__}')
 print(f'  CUDA available: {torch.cuda.is_available()}')
 if torch.cuda.is_available():
     print(f'  GPU: {torch.cuda.get_device_name(0)}')
-    mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
-    print(f'  Memory: {mem_gb:.1f} GB')
+    props = torch.cuda.get_device_properties(0)
+    # total_memory in newer PyTorch, total_mem in older
+    mem = getattr(props, 'total_memory', None) or getattr(props, 'total_mem', 0)
+    print(f'  Memory: {mem / 1e9:.1f} GB')
 else:
     print('  WARNING: No GPU detected. Training will be slow.')
 " || {
-    echo "  WARNING: PyTorch import failed. Showing error:"
-    python -c "import torch" 2>&1 | head -5
+    echo "  WARNING: PyTorch check failed. Showing error:"
+    python -c "import torch; print(torch.__version__)" 2>&1 | head -5
     echo "  Check that venv was set up correctly: bash scripts/run_hpc.sh setup"
 }
     echo "-----------------------------"

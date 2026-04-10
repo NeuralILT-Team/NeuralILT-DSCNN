@@ -170,7 +170,8 @@ def test_gpu_memory_estimate():
     from src.models.common import build_model
     from src.utils.io import load_config, merge_configs
 
-    gpu_mem = torch.cuda.get_device_properties(0).total_mem / 1e9
+    props = torch.cuda.get_device_properties(0)
+    gpu_mem = (getattr(props, 'total_memory', None) or getattr(props, 'total_mem', 0)) / 1e9
     print(f'         GPU: {torch.cuda.get_device_name(0)} ({gpu_mem:.1f} GB)')
 
     for cfg_path in ['configs/baseline.yaml', 'configs/dscnn.yaml']:
