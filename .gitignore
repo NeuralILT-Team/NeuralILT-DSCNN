@@ -21,3 +21,4 @@ venv/
 logs/
 slurm_*.out
 slurm_*.err
+ilt-env/
