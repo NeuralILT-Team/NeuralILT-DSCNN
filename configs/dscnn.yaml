@@ -1,0 +1,32 @@
+# Depthwise Separable CNN (DS-CNN) U-Net configuration
+# Proposed efficient architecture per CMPE 257 project proposal
+#
+# SJSU HPC GPU: 12GB VRAM — DS-CNN uses less memory than baseline
+# Same features/batch/image_size as baseline for fair comparison.
+
+model:
+  name: dscnn
+  in_channels: 1
+  out_channels: 1
+  features: [64, 128, 256, 512]  # same depth as baseline for fair comparison
+
+# image_size is in configs/data.yaml (single source of truth)
+
+training:
+  epochs: 50
+  batch_size: 4           # same as baseline for fair comparison
+  learning_rate: 1.0e-4
+  weight_decay: 0.0
+  optimizer: adam
+  scheduler:
+    type: cosine
+    min_lr: 1.0e-6
+  loss: mse
+  grad_clip: 1.0
+  mixed_precision: true   # use float16 to halve memory
+  grad_accumulation: 4    # effective batch size = 4 * 4 = 16
+
+# Checkpoint and logging
+checkpoint_dir: results/checkpoints/dscnn
+log_dir: results/logs/dscnn
+save_every: 10

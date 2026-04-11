@@ -1,7 +1,34 @@
-model: baseline
-epochs: 50
-batch_size: 16
-learning_rate: 1e-4
-loss: mse
-optimizer: adam
-dataset: MetalSet
+# Baseline U-Net configuration
+# Standard convolution encoder-decoder as per LithoBench NeuralILT
+#
+# SJSU HPC GPU: 12GB VRAM
+# LithoBench tiles are 2048x2048 natively — resized to 256x256 during
+# preprocessing and again at load time (safety net). With 256x256 images,
+# batch=4 + AMP fits comfortably on 12GB.
+
+model:
+  name: baseline
+  in_channels: 1
+  out_channels: 1
+  features: [64, 128, 256, 512]  # 4-level encoder-decoder
+
+# image_size is in configs/data.yaml (single source of truth)
+
+training:
+  epochs: 50
+  batch_size: 4
+  learning_rate: 1.0e-4
+  weight_decay: 0.0
+  optimizer: adam
+  scheduler:
+    type: cosine
+    min_lr: 1.0e-6
+  loss: mse
+  grad_clip: 1.0
+  mixed_precision: true   # use float16 to halve memory
+  grad_accumulation: 4    # effective batch size = 4 * 4 = 16
+
+# Checkpoint and logging
+checkpoint_dir: results/checkpoints/baseline
+log_dir: results/logs/baseline
+save_every: 10
