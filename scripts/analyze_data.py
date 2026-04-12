@@ -264,7 +264,7 @@ def analyze_comparison():
 
 
 def analyze_generalization():
-    """Parse generalization results."""
+    """Parse generalization / consistency test results."""
     gen_path = Path("results/generalization_results.json")
     if not gen_path.exists():
         print("\nNo generalization results found.")
@@ -274,17 +274,35 @@ def analyze_generalization():
     with open(gen_path) as f:
         data = json.load(f)
 
-    print(f"\n--- Generalization Results (Experiment 4) ---")
-    print(f"  {'Model':<15s} {'Dataset':<15s} {'MSE':>10s} {'SSIM':>10s} {'EPE':>10s}")
-    print(f"  {'-' * 60}")
-
-    for model_name, datasets in data.items():
-        for ds_name, r in datasets.items():
-            acc = r.get("accuracy", {})
-            print(f"  {model_name:<15s} {ds_name:<15s} "
-                  f"{acc.get('mse', 0):>10.6f} "
-                  f"{acc.get('ssim', 0):>10.6f} "
-                  f"{acc.get('epe', 0):>10.4f}")
+    # detect format: consistency test (new) vs accuracy test (old)
+    first_val = next(iter(data.values()), {})
+    if isinstance(first_val, dict) and "consistency" in first_val:
+        # new consistency test format: {dataset: {consistency: {...}}}
+        print(f"\n--- Consistency Test Results (Experiment 4) ---")
+        print(f"  Comparing baseline vs DS-CNN predictions on unseen layouts")
+        print(f"  {'Dataset':<15s} {'MSE(B vs D)':>12s} {'SSIM(B vs D)':>12s} {'B mean':>10s} {'D mean':>10s}")
+        print(f"  {'-' * 60}")
+        for ds_name, r in data.items():
+            c = r.get("consistency", {})
+            print(f"  {ds_name:<15s} "
+                  f"{c.get('mse_between_models', 0):>12.6f} "
+                  f"{c.get('ssim_between_models', 0):>12.6f} "
+                  f"{c.get('baseline_mean_pred', 0):>10.6f} "
+                  f"{c.get('dscnn_mean_pred', 0):>10.6f}")
+    else:
+        # old accuracy test format: {model: {dataset: {accuracy: {...}}}}
+        print(f"\n--- Generalization Results (Experiment 4) ---")
+        print(f"  {'Model':<15s} {'Dataset':<15s} {'MSE':>10s} {'SSIM':>10s} {'EPE':>10s}")
+        print(f"  {'-' * 60}")
+        for model_name, datasets in data.items():
+            if isinstance(datasets, dict):
+                for ds_name, r in datasets.items():
+                    if isinstance(r, dict):
+                        acc = r.get("accuracy", {})
+                        print(f"  {model_name:<15s} {ds_name:<15s} "
+                              f"{acc.get('mse', 0):>10.6f} "
+                              f"{acc.get('ssim', 0):>10.6f} "
+                              f"{acc.get('epe', 0):>10.4f}")
 
 
 def analyze_results():
