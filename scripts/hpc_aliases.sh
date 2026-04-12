@@ -24,6 +24,8 @@ _ilt_python() {
 # ─── Quick submit ────────────────────────────────────────────────────
 alias ilt-setup='bash scripts/run_hpc.sh setup'
 alias ilt-download='bash scripts/download_data.sh MetalSet'
+alias ilt-download-benchmarks='bash scripts/download_data.sh benchmarks'
+alias ilt-preprocess='_ilt_python -m src.data.preprocess --all'
 alias ilt-verify='_ilt_python scripts/verify_env.py'
 alias ilt-validate='_ilt_python scripts/validate_pipeline.py'
 alias ilt-run='sbatch scripts/run_hpc.sh'
@@ -58,8 +60,13 @@ alias quota='df -h /home/$USER'
 
 echo "NeuralILT HPC aliases loaded. Commands:"
 echo ""
+echo "  Setup & Data:"
+echo "    ilt-setup              — one-time environment setup"
+echo "    ilt-download           — download MetalSet from Google Drive"
+echo "    ilt-download-benchmarks — download StdMetal/StdContact"
+echo "    ilt-preprocess         — preprocess all datasets (resize to 256x256)"
+echo ""
 echo "  Training:"
-echo "    ilt-setup         — one-time environment setup"
 echo "    ilt-run           — submit full pipeline"
 echo "    ilt-baseline      — train baseline only"
 echo "    ilt-dscnn         — train DS-CNN only"

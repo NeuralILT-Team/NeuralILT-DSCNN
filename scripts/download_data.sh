@@ -311,6 +311,76 @@ download_benchmarks() {
 }
 
 # ─────────────────────────────────────────────────────────────────────
+# Download tarball and extract StdMetal + StdContact (rendered PNGs)
+# The git repo only has .glp files; rendered images are in the tarball.
+# ─────────────────────────────────────────────────────────────────────
+download_stdmetal_from_tarball() {
+    # Skip if already have PNG images
+    if [ -d "${DATA_DIR}/StdMetal/target" ]; then
+        sample=$(ls "${DATA_DIR}/StdMetal/target/" | head -1)
+        if echo "$sample" | grep -qi "\.png$\|\.bmp$"; then
+            n=$(ls "${DATA_DIR}/StdMetal/target/" | wc -l)
+            echo "[OK] StdMetal already has image files (${n} tiles) — skipping"
+            return 0
+        else
+            echo "[WARN] StdMetal has .glp files, not images. Need to extract from tarball."
+            rm -rf "${DATA_DIR}/StdMetal" "${DATA_DIR}/StdContact"
+        fi
+    fi
+
+    local tarball="${DATA_DIR}/lithodata.tar.gz"
+
+    # Download tarball if not present
+    if [ ! -f "$tarball" ]; then
+        echo ""
+        echo ">>> Downloading tarball to extract StdMetal/StdContact..."
+        echo "    (15GB download — only need StdMetal target+litho from it)"
+        echo ""
+        download_gdrive "$GDRIVE_FILE_ID" "$tarball"
+    fi
+
+    if [ ! -f "$tarball" ] || [ ! -s "$tarball" ]; then
+        echo "ERROR: Tarball download failed."
+        return 1
+    fi
+
+    echo ""
+    echo "Extracting StdMetal and StdContact (target + litho only)..."
+
+    # Extract StdMetal target + litho
+    tar xzf "$tarball" -C "$DATA_DIR/" --wildcards \
+        '*/StdMetal/target/*' '*/StdMetal/litho/*' \
+        '*/StdContact/target/*' '*/StdContact/litho/*' \
+        2>&1 | awk 'NR % 100 == 0 {print "  " NR " files..."}'
+
+    # Move to correct location if nested
+    for ds in StdMetal StdContact; do
+        if [ ! -d "${DATA_DIR}/${ds}/target" ]; then
+            FOUND=$(find "${DATA_DIR}" -maxdepth 4 -type d -name "${ds}" | head -1)
+            if [ -n "$FOUND" ] && [ "$FOUND" != "${DATA_DIR}/${ds}" ]; then
+                mkdir -p "${DATA_DIR}/${ds}"
+                mv "$FOUND"/* "${DATA_DIR}/${ds}/" 2>/dev/null
+                rmdir "$FOUND" 2>/dev/null
+            fi
+        fi
+    done
+
+    # Verify
+    for ds in StdMetal StdContact; do
+        if [ -d "${DATA_DIR}/${ds}/target" ]; then
+            n=$(ls "${DATA_DIR}/${ds}/target/" 2>/dev/null | wc -l)
+            echo "[OK] ${ds}: ${n} target tiles"
+        else
+            echo "[SKIP] ${ds}: not found in tarball"
+        fi
+    done
+
+    # Clean up tarball to save space
+    echo "Removing tarball to save disk space..."
+    rm -f "$tarball"
+}
+
+# ─────────────────────────────────────────────────────────────────────
 # Extract a manually uploaded tarball
 # ─────────────────────────────────────────────────────────────────────
 extract_tarball() {
@@ -361,20 +431,20 @@ case "$MODE" in
         download_metalset
         ;;
     benchmarks|StdMetal|StdContact)
-        download_benchmarks
+        download_stdmetal_from_tarball
         ;;
     extract)
         extract_tarball
         ;;
     all)
         download_metalset
-        download_benchmarks
+        download_stdmetal_from_tarball
         ;;
     *)
         echo "Usage: bash scripts/download_data.sh [MetalSet|benchmarks|extract|all]"
         echo ""
-        echo "  MetalSet    — download main dataset from Google Drive (~2GB)"
-        echo "  benchmarks  — download StdMetal/StdContact from GitHub"
+        echo "  MetalSet    — download main dataset from Google Drive"
+        echo "  benchmarks  — download StdMetal/StdContact (re-downloads tarball if needed)"
         echo "  extract     — extract a manually uploaded lithodata.tar.gz"
         echo "  all         — download everything"
         exit 1
