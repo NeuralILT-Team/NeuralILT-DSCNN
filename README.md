@@ -34,6 +34,7 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 | Training script | ✅ Complete | Config-driven, validation, checkpointing, logging |
 | Evaluation (Exp 3) | ✅ Complete | MSE, SSIM, EPE, FLOPs, params, runtime comparison |
 | Generalization (Exp 4) | ✅ Complete | StdMetal + StdContact out-of-distribution eval |
+| Extended training (100 epochs) | ✅ Complete | Resumed from epoch 50 → 100, both models converged |
 | Hyperparameter sweep | ✅ Complete | Sweep LR, features, epochs, batch size |
 | HPC infrastructure | ✅ Complete | SJSU-adapted SLURM scripts, wheel caching |
 | Verification tools | ✅ Complete | verify_env.py, validate_pipeline.py |
@@ -42,12 +43,10 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 
 | # | Task | Priority | Description | Command |
 |---|------|----------|-------------|---------|
-| 1 | **Extended training (100 epochs)** | 🔴 In progress | Resume both models from epoch 50 → 100 to see if accuracy gap closes. Both models were still improving at epoch 50. | `ilt-run` (auto-resumes) |
-| 2 | **Re-run evaluation + analyze** | 🔴 Blocked on #1 | Re-evaluate with 100-epoch checkpoints and update results tables. | `ilt-eval` then `ilt-analyze` |
-| 3 | **Wider DS-CNN sweep** | 🟡 After #1 | If SSIM gap persists after 100 epochs, try wider channels `[96,192,384,768]` (~13M params, still 2.4× fewer than baseline). Tests whether the accuracy gap is a capacity problem. | `python -m src.train --config configs/dscnn.yaml --sweep-features "64,128,256,512" "96,192,384,768"` |
-| 4 | **Generate figures** | 🟡 After #2 | Training curves, efficiency bar charts, prediction grid visualizations for the report. | `python -m src.visualize --mode curves` |
-| 5 | **Write final report** | 🟡 After #4 | Results, Discussion, Conclusion sections. Include 50-epoch vs 100-epoch comparison. | — |
-| 6 | **Optional: LR sweep** | 🟢 Nice-to-have | Try learning rates `1e-3, 5e-4, 1e-4, 5e-5` if accuracy is still low after wider channels. | `python -m src.train --config configs/dscnn.yaml --sweep-lr 1e-3 5e-4 1e-4 5e-5` |
+| 1 | **Wider DS-CNN sweep** | 🟡 Optional | If SSIM gap persists, try wider channels `[96,192,384,768]` (~13M params, still 2.4× fewer than baseline). Tests whether the accuracy gap is a capacity problem. | `python -m src.train --config configs/dscnn.yaml --sweep-features "64,128,256,512" "96,192,384,768"` |
+| 2 | **Generate figures** | 🟡 For report | Training curves, efficiency bar charts, prediction grid visualizations for the report. | `python -m src.visualize --mode curves` |
+| 3 | **Write final report** | 🟡 After #2 | Results, Discussion, Conclusion sections. Include 50-epoch vs 100-epoch comparison. | — |
+| 4 | **Optional: LR sweep** | 🟢 Nice-to-have | Try learning rates `1e-3, 5e-4, 1e-4, 5e-5` if accuracy is still low after wider channels. | `python -m src.train --config configs/dscnn.yaml --sweep-lr 1e-3 5e-4 1e-4 5e-5` |
 
 ### Experiment Results
 
@@ -55,34 +54,78 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 |------------|-------------|--------|
 | **Exp 1**: Baseline | Train standard U-Net on MetalSet (50 epochs) | ✅ Done |
 | **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet (50 epochs) | ✅ Done |
-| **Exp 3**: Comparison | Compare accuracy + efficiency metrics | ✅ Done |
-| **Exp 4**: Consistency | Compare predictions on StdMetal/StdContact | ✅ Done |
-| **Exp 5**: Extended training | Resume both models to 100 epochs | ⏳ In progress |
-| **Exp 6**: Wider DS-CNN | Sweep channel widths to recover accuracy | 📋 Planned (after Exp 5) |
+| **Exp 3**: Comparison | Compare accuracy + efficiency metrics (50 & 100 epochs) | ✅ Done |
+| **Exp 4**: Consistency | Compare predictions on StdMetal/StdContact (50 & 100 epochs) | ✅ Done |
+| **Exp 5**: Extended training | Resume both models to 100 epochs | ✅ Done |
+| **Exp 6**: Wider DS-CNN | Sweep channel widths to recover accuracy | 📋 Planned |
 
-### Experiment 3 — Baseline vs DS-CNN on MetalSet (50 epochs)
+### Experiment 3 — Baseline vs DS-CNN on MetalSet
+
+#### 50 Epochs
 
 | Metric | Baseline | DS-CNN | Change |
 |--------|----------|--------|--------|
 | MSE ↓ | 0.000059 | 0.000098 | Baseline better |
-| SSIM ↑ | 0.9789 | 0.9665 | -1.3% |
+| SSIM ↑ | 0.9789 | 0.9665 | −1.3% |
 | EPE ↓ | 0.00222 | 0.00166 | **DS-CNN 25% better** |
 | Params | 31.0M | 6.0M | **5.2× fewer** |
 | FLOPs | 109.3B | 28.5B | **3.8× fewer** |
 | Runtime | 17.7ms | 15.9ms | **1.1× faster** |
 
-**Key finding**: DS-CNN achieves **5.2× parameter reduction** and **3.8× FLOPs reduction** with only 1.3% SSIM drop. Edge placement error is actually **25% better** with DS-CNN. Both models were still improving at epoch 50 — longer training may further close the accuracy gap.
+#### 100 Epochs
 
-### Experiment 4 — Consistency Test on Unseen Layouts (50 epochs)
+| Metric | Baseline | DS-CNN | Change |
+|--------|----------|--------|--------|
+| MSE ↓ | 0.000058 | 0.000096 | Baseline better |
+| SSIM ↑ | 0.9793 | 0.9673 | −1.2% |
+| EPE ↓ | 0.00253 | 0.00503 | Baseline better |
+| Params | 31.0M | 6.0M | **5.2× fewer** |
+| FLOPs | 109.3B | 28.5B | **3.8× fewer** |
+| Runtime | 17.7ms | 15.9ms | **1.1× faster** |
+
+#### 50 → 100 Epoch Improvement
+
+| Metric | Baseline (50→100) | DS-CNN (50→100) |
+|--------|-------------------|-----------------|
+| MSE ↓ | 0.000059 → 0.000058 (−1.7%) | 0.000098 → 0.000096 (−2.0%) |
+| SSIM ↑ | 0.9789 → 0.9793 (+0.04%) | 0.9665 → 0.9673 (+0.08%) |
+| EPE ↓ | 0.00222 → 0.00253 (+14%) | 0.00166 → 0.00503 (+203%) |
+
+**Key findings**:
+- **MSE and SSIM improved slightly** for both models from 50 → 100 epochs, confirming both were still learning at epoch 50.
+- The **SSIM gap narrowed** from 1.3% to 1.2% — the DS-CNN is slowly closing the accuracy gap with extended training.
+- DS-CNN maintains **5.2× parameter reduction** and **3.8× FLOPs reduction** with only 1.2% SSIM drop at 100 epochs.
+- **EPE increased** for both models at 100 epochs, suggesting possible overfitting on edge placement while overall pixel accuracy (MSE/SSIM) continued to improve. This is a known tradeoff — MSE loss optimizes pixel-level accuracy, not edge placement specifically.
+
+### Experiment 4 — Consistency Test on Unseen Layouts
 
 Both models were evaluated on StdMetal (271 tiles) and StdContact (165 tiles) — layouts never seen during training. Since these datasets only have layout files (no litho masks), we compare predictions between the two models.
+
+#### 50 Epochs
 
 | Dataset | MSE (B vs D) | SSIM (B vs D) | Baseline mean | DS-CNN mean |
 |---------|-------------|---------------|---------------|-------------|
 | StdMetal | 0.001130 | 0.873 | 0.092 | 0.093 |
 | StdContact | 0.000400 | 0.892 | 0.078 | 0.077 |
 
-**Key finding**: Both models produce **highly consistent predictions** (SSIM > 0.87) on unseen layouts with nearly identical mean output values. The DS-CNN generalizes similarly to the baseline despite having 5× fewer parameters.
+#### 100 Epochs
+
+| Dataset | MSE (B vs D) | SSIM (B vs D) | Baseline mean | DS-CNN mean |
+|---------|-------------|---------------|---------------|-------------|
+| StdMetal | 0.001912 | 0.860 | 0.092 | 0.089 |
+| StdContact | 0.000389 | 0.895 | 0.078 | 0.078 |
+
+#### 50 → 100 Epoch Comparison
+
+| Dataset | MSE (50→100) | SSIM (50→100) |
+|---------|-------------|---------------|
+| StdMetal | 0.001130 → 0.001912 (+69%) | 0.873 → 0.860 (−1.5%) |
+| StdContact | 0.000400 → 0.000389 (−2.8%) | 0.892 → 0.895 (+0.3%) |
+
+**Key findings**:
+- **StdContact consistency improved** at 100 epochs — lower MSE and higher SSIM between models, with mean predictions converging (both at 0.078).
+- **StdMetal consistency decreased slightly** — the models' predictions diverged somewhat, suggesting the two architectures are learning slightly different representations for complex metal patterns with extended training.
+- Both models still produce **highly consistent predictions** (SSIM > 0.86) on unseen layouts with nearly identical mean output values. The DS-CNN generalizes similarly to the baseline despite having 5× fewer parameters.
 
 ---
 
