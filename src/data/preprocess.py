@@ -68,6 +68,18 @@ def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
     raw_path = RAW_DIR / dataset_name
     out_dir = PROCESSED_BASE / dataset_name
 
+    # Skip if already processed at the correct size
+    processed_layouts = out_dir / "layouts"
+    if processed_layouts.exists():
+        existing = list(processed_layouts.iterdir())
+        if len(existing) > 0:
+            sample_size = Image.open(existing[0]).size
+            if sample_size == (image_size, image_size):
+                print(f"[SKIP] {dataset_name}: already processed ({len(existing)} tiles, {image_size}x{image_size})")
+                return len(existing)
+            else:
+                print(f"[WARN] {dataset_name}: processed at {sample_size[0]}x{sample_size[1]}, need {image_size}x{image_size} — re-processing")
+
     if not raw_path.exists():
         print(f"[SKIP] {dataset_name}: not found at {raw_path}")
         return 0
