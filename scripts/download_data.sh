@@ -220,41 +220,88 @@ download_metalset() {
 download_benchmarks() {
     echo ""
     echo ">>> Downloading StdMetal and StdContact from LithoBench repo..."
-    echo "    NOTE: The LithoBench git repo is large (~15GB with models/kernels)."
-    echo "    We use sparse checkout to only download benchmark/ (~1MB)."
     echo ""
+
+    # Check if already downloaded
+    if [ -d "${DATA_DIR}/StdMetal/target" ] && [ -d "${DATA_DIR}/StdMetal/litho" ]; then
+        n=$(ls "${DATA_DIR}/StdMetal/target/" 2>/dev/null | wc -l)
+        echo "[OK] StdMetal already exists (${n} tiles) — skipping"
+        return 0
+    fi
 
     local TEMP_DIR
     TEMP_DIR=$(mktemp -d)
 
-    git clone --depth 1 --filter=blob:none --sparse \
-        https://github.com/shelljane/lithobench.git "$TEMP_DIR/lithobench" 2>/dev/null
+    echo "  Cloning LithoBench repo (sparse checkout)..."
 
-    cd "$TEMP_DIR/lithobench"
-    git sparse-checkout set benchmark/StdMetal benchmark/StdContact 2>/dev/null || {
-        # fallback: just use what we got
-        echo "  Sparse checkout not supported, using full clone..."
-        cd "$TEMP_DIR"
-        rm -rf lithobench
-        git clone --depth 1 https://github.com/shelljane/lithobench.git "$TEMP_DIR/lithobench"
-    }
-    cd - >/dev/null
+    # Try sparse checkout first (downloads only benchmark/ directory)
+    if git clone --depth 1 --filter=blob:none --sparse \
+        https://github.com/shelljane/lithobench.git "$TEMP_DIR/lithobench" 2>&1; then
+
+        cd "$TEMP_DIR/lithobench"
+        git sparse-checkout set benchmark/ 2>&1 || true
+        cd - >/dev/null
+    else
+        echo "  Sparse checkout failed, trying full shallow clone..."
+        rm -rf "$TEMP_DIR/lithobench"
+        git clone --depth 1 https://github.com/shelljane/lithobench.git "$TEMP_DIR/lithobench" 2>&1 || {
+            echo ""
+            echo "ERROR: git clone failed. Check internet access."
+            echo "You're on: $(hostname)"
+            echo "Try running this on the login node (has internet)."
+            rm -rf "$TEMP_DIR"
+            return 1
+        }
+    fi
+
+    echo "  Repo contents:"
+    ls "$TEMP_DIR/lithobench/benchmark/" 2>/dev/null || ls "$TEMP_DIR/lithobench/" 2>/dev/null
 
     # Copy StdMetal
-    if [ -d "$TEMP_DIR/lithobench/benchmark/StdMetal" ]; then
+    local stdmetal_src
+    stdmetal_src=$(find "$TEMP_DIR/lithobench" -type d -name "StdMetal" | head -1)
+    if [ -n "$stdmetal_src" ]; then
+        echo "  Found StdMetal at: $stdmetal_src"
         mkdir -p "${DATA_DIR}/StdMetal"
-        cp -r "$TEMP_DIR/lithobench/benchmark/StdMetal" "${DATA_DIR}/"
-        n=$(ls "${DATA_DIR}/StdMetal/" 2>/dev/null | wc -l)
+        cp -r "$stdmetal_src"/* "${DATA_DIR}/StdMetal/" 2>/dev/null || \
+            cp -r "$stdmetal_src" "${DATA_DIR}/"
+
+        # StdMetal needs target/ and litho/ subdirs for our pipeline
+        # The repo might have a different structure — check and adapt
+        if [ ! -d "${DATA_DIR}/StdMetal/target" ]; then
+            echo "  StdMetal doesn't have target/ subdir. Contents:"
+            ls "${DATA_DIR}/StdMetal/" | head -10
+            echo "  Creating target/ and litho/ from available files..."
+            mkdir -p "${DATA_DIR}/StdMetal/target" "${DATA_DIR}/StdMetal/litho"
+            # Move image files to target/ (they'll be used as both input and target)
+            find "${DATA_DIR}/StdMetal" -maxdepth 1 -type f \( -name "*.png" -o -name "*.bmp" -o -name "*.jpg" -o -name "*.gds" -o -name "*.glp" \) \
+                -exec mv {} "${DATA_DIR}/StdMetal/target/" \;
+        fi
+
+        n=$(find "${DATA_DIR}/StdMetal" -type f | wc -l)
         echo "[OK] StdMetal: ${n} files"
     else
         echo "[SKIP] StdMetal not found in repo"
+        echo "  Searched in: $TEMP_DIR/lithobench/"
+        find "$TEMP_DIR/lithobench" -maxdepth 3 -type d | head -20
     fi
 
     # Copy StdContact
-    if [ -d "$TEMP_DIR/lithobench/benchmark/StdContact" ]; then
+    local stdcontact_src
+    stdcontact_src=$(find "$TEMP_DIR/lithobench" -type d -name "StdContact" | head -1)
+    if [ -n "$stdcontact_src" ]; then
+        echo "  Found StdContact at: $stdcontact_src"
         mkdir -p "${DATA_DIR}/StdContact"
-        cp -r "$TEMP_DIR/lithobench/benchmark/StdContact" "${DATA_DIR}/"
-        n=$(ls "${DATA_DIR}/StdContact/" 2>/dev/null | wc -l)
+        cp -r "$stdcontact_src"/* "${DATA_DIR}/StdContact/" 2>/dev/null || \
+            cp -r "$stdcontact_src" "${DATA_DIR}/"
+
+        if [ ! -d "${DATA_DIR}/StdContact/target" ]; then
+            mkdir -p "${DATA_DIR}/StdContact/target" "${DATA_DIR}/StdContact/litho"
+            find "${DATA_DIR}/StdContact" -maxdepth 1 -type f \
+                -exec mv {} "${DATA_DIR}/StdContact/target/" \;
+        fi
+
+        n=$(find "${DATA_DIR}/StdContact" -type f | wc -l)
         echo "[OK] StdContact: ${n} files"
     else
         echo "[SKIP] StdContact not found in repo"
