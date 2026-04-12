@@ -12,17 +12,26 @@ alias jobs='squeue -u $USER'
 alias myjobs='squeue -u $USER --format="%.8i %.20j %.8T %.10M %.6D %R"'
 alias killall='scancel -u $USER'
 
+# ─── Activate venv helper (CentOS 7 default is Python 2.7) ──────────
+_ilt_python() {
+    if [ -f "venv/bin/python" ]; then
+        venv/bin/python "$@"
+    else
+        python3 "$@"
+    fi
+}
+
 # ─── Quick submit ────────────────────────────────────────────────────
 alias ilt-setup='bash scripts/run_hpc.sh setup'
 alias ilt-download='bash scripts/download_data.sh MetalSet'
-alias ilt-verify='python scripts/verify_env.py'
-alias ilt-validate='python scripts/validate_pipeline.py'
+alias ilt-verify='_ilt_python scripts/verify_env.py'
+alias ilt-validate='_ilt_python scripts/validate_pipeline.py'
 alias ilt-run='sbatch scripts/run_hpc.sh'
 alias ilt-baseline='sbatch scripts/run_hpc.sh baseline'
 alias ilt-dscnn='sbatch scripts/run_hpc.sh dscnn'
 alias ilt-eval='sbatch scripts/run_hpc.sh eval'
 alias ilt-generalize='sbatch scripts/run_hpc.sh generalize'
-alias ilt-analyze='python scripts/analyze_data.py all'
+alias ilt-analyze='_ilt_python scripts/analyze_data.py all'
 
 # ─── Log viewing ─────────────────────────────────────────────────────
 alias lastlog='ls -t logs/slurm_*.out 2>/dev/null | head -1 | xargs tail -f'
