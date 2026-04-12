@@ -90,10 +90,13 @@ def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
     if not layout_dir.exists():
         print(f"[SKIP] {dataset_name}: no target/ directory")
         return 0
-    if not mask_dir.exists():
+    # Check if litho/ exists AND has files. StdMetal/StdContact may have
+    # an empty litho/ directory created by the download script.
+    mask_exists = mask_dir.exists() and any(mask_dir.iterdir())
+    if not mask_exists:
         # StdMetal/StdContact only have layouts, no litho masks.
         # Use layouts as masks too (consistency test doesn't use masks anyway).
-        print(f"[INFO] {dataset_name}: no litho/ directory — using target/ as both layout and mask")
+        print(f"[INFO] {dataset_name}: no litho data — using target/ as both layout and mask")
         mask_dir = layout_dir
 
     # create output dirs
