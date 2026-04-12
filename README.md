@@ -40,12 +40,14 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 
 ### What's Next 🔜
 
-| Step | Priority | Description |
-|------|----------|-------------|
-| **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
-| **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids |
-| **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low |
-| **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
+| # | Task | Priority | Description | Command |
+|---|------|----------|-------------|---------|
+| 1 | **Extended training (100 epochs)** | 🔴 In progress | Resume both models from epoch 50 → 100 to see if accuracy gap closes. Both models were still improving at epoch 50. | `ilt-run` (auto-resumes) |
+| 2 | **Re-run evaluation + analyze** | 🔴 Blocked on #1 | Re-evaluate with 100-epoch checkpoints and update results tables. | `ilt-eval` then `ilt-analyze` |
+| 3 | **Wider DS-CNN sweep** | 🟡 After #1 | If SSIM gap persists after 100 epochs, try wider channels `[96,192,384,768]` (~13M params, still 2.4× fewer than baseline). Tests whether the accuracy gap is a capacity problem. | `python -m src.train --config configs/dscnn.yaml --sweep-features "64,128,256,512" "96,192,384,768"` |
+| 4 | **Generate figures** | 🟡 After #2 | Training curves, efficiency bar charts, prediction grid visualizations for the report. | `python -m src.visualize --mode curves` |
+| 5 | **Write final report** | 🟡 After #4 | Results, Discussion, Conclusion sections. Include 50-epoch vs 100-epoch comparison. | — |
+| 6 | **Optional: LR sweep** | 🟢 Nice-to-have | Try learning rates `1e-3, 5e-4, 1e-4, 5e-5` if accuracy is still low after wider channels. | `python -m src.train --config configs/dscnn.yaml --sweep-lr 1e-3 5e-4 1e-4 5e-5` |
 
 ### Experiment Results
 
@@ -55,6 +57,8 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 | **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet (50 epochs) | ✅ Done |
 | **Exp 3**: Comparison | Compare accuracy + efficiency metrics | ✅ Done |
 | **Exp 4**: Consistency | Compare predictions on StdMetal/StdContact | ✅ Done |
+| **Exp 5**: Extended training | Resume both models to 100 epochs | ⏳ In progress |
+| **Exp 6**: Wider DS-CNN | Sweep channel widths to recover accuracy | 📋 Planned (after Exp 5) |
 
 ### Experiment 3 — Baseline vs DS-CNN on MetalSet (50 epochs)
 
