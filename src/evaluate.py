@@ -144,15 +144,20 @@ def evaluate_generalization(config, checkpoint_path, dataset_name, dataset_dir):
 
 def run_generalization(data_config):
     """
-    Run Experiment 4: generalization evaluation on StdMetal and StdContact.
+    Run Experiment 4: consistency test on StdMetal and StdContact.
 
-    Evaluates both baseline and DS-CNN on out-of-distribution datasets
-    to test the hypothesis that DS-CNN (fewer params) may generalize
-    similarly or better than the baseline.
+    Since StdMetal/StdContact only have layout files (no litho masks),
+    we run a consistency test: feed the same layouts through both models
+    and compare their predictions. This measures how similarly the two
+    architectures handle out-of-distribution inputs.
+
+    Metrics:
+    - MSE between baseline and DS-CNN predictions (lower = more consistent)
+    - SSIM between baseline and DS-CNN predictions (higher = more consistent)
+    - Mean prediction value for each model (sanity check)
     """
     gen_cfg = data_config.get("generalization", {})
 
-    # datasets to evaluate on
     gen_datasets = {}
     if "stdmetal" in gen_cfg:
         gen_datasets["StdMetal"] = gen_cfg["stdmetal"]["processed_dir"]
@@ -163,8 +168,8 @@ def run_generalization(data_config):
         print("No generalization datasets configured in data.yaml")
         return {}
 
-    results = {}
-
+    # load both models
+    models = {}
     for model_name, config_path, ckpt_path in [
         ("baseline", "configs/baseline.yaml", "results/checkpoints/baseline/best_model.pt"),
         ("dscnn", "configs/dscnn.yaml", "results/checkpoints/dscnn/best_model.pt"),
@@ -174,26 +179,96 @@ def run_generalization(data_config):
             continue
 
         config = merge_configs(data_config, load_config(config_path))
-        results[model_name] = {}
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = build_model(config)
+        load_checkpoint(ckpt_path, model, device=str(device))
+        model = model.to(device).eval()
+        models[model_name] = model
 
-        for ds_name, ds_dir in gen_datasets.items():
-            result = evaluate_generalization(config, ckpt_path, ds_name, ds_dir)
-            if result is not None:
-                results[model_name][ds_name] = result
+    if len(models) < 2:
+        print("Need both baseline and dscnn checkpoints for consistency test")
+        return {}
 
-    # print comparison table
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    results = {}
+
+    for ds_name, ds_dir in gen_datasets.items():
+        ds_dir = Path(ds_dir)
+        if not (ds_dir / "layouts").exists():
+            print(f"[SKIP] {ds_name}: not found at {ds_dir}")
+            continue
+
+        # load layouts only — use layouts as both input and "mask" (we ignore the mask)
+        ds = LithoBenchDataset(ds_dir, transform=get_eval_transforms())
+        if len(ds) == 0:
+            print(f"[SKIP] {ds_name}: empty dataset")
+            continue
+
+        loader = DataLoader(ds, batch_size=4, shuffle=False, num_workers=2)
+
+        print(f"\nConsistency test on {ds_name} ({len(ds)} tiles)...")
+
+        total_mse = 0.0
+        total_ssim = 0.0
+        baseline_mean = 0.0
+        dscnn_mean = 0.0
+        n = 0
+
+        with torch.no_grad():
+            for layouts, _ in loader:
+                layouts = layouts.to(device)
+
+                pred_baseline = models["baseline"](layouts)
+                pred_dscnn = models["dscnn"](layouts)
+
+                # compare predictions between models
+                total_mse += compute_mse_batch(pred_baseline, pred_dscnn)
+                total_ssim += compute_ssim_batch(pred_baseline, pred_dscnn)
+                baseline_mean += pred_baseline.mean().item()
+                dscnn_mean += pred_dscnn.mean().item()
+                n += 1
+
+        d = max(n, 1)
+        result = {
+            "dataset": ds_name,
+            "num_tiles": len(ds),
+            "consistency": {
+                "mse_between_models": total_mse / d,
+                "ssim_between_models": total_ssim / d,
+                "baseline_mean_pred": baseline_mean / d,
+                "dscnn_mean_pred": dscnn_mean / d,
+            }
+        }
+        results[ds_name] = result
+
+        print(f"  MSE  (baseline vs DS-CNN): {result['consistency']['mse_between_models']:.6f}")
+        print(f"  SSIM (baseline vs DS-CNN): {result['consistency']['ssim_between_models']:.6f}")
+        print(f"  Baseline mean prediction:  {result['consistency']['baseline_mean_pred']:.6f}")
+        print(f"  DS-CNN mean prediction:    {result['consistency']['dscnn_mean_pred']:.6f}")
+
+    # print summary
     if results:
         print(f"\n{'=' * 70}")
-        print("GENERALIZATION RESULTS (Experiment 4)")
+        print("CONSISTENCY TEST RESULTS (Experiment 4)")
+        print("(Comparing baseline vs DS-CNN predictions on unseen layouts)")
         print(f"{'=' * 70}")
-        print(f"  {'Model':<15s} {'Dataset':<15s} {'MSE':>10s} {'SSIM':>10s} {'EPE':>10s}")
+        print(f"  {'Dataset':<15s} {'MSE(B vs D)':>12s} {'SSIM(B vs D)':>12s} {'B mean':>10s} {'D mean':>10s}")
         print(f"  {'-' * 60}")
-        for model_name, datasets in results.items():
-            for ds_name, r in datasets.items():
-                acc = r["accuracy"]
-                print(f"  {model_name:<15s} {ds_name:<15s} "
-                      f"{acc['mse']:>10.6f} {acc['ssim']:>10.6f} {acc['epe']:>10.4f}")
+        for ds_name, r in results.items():
+            c = r["consistency"]
+            print(f"  {ds_name:<15s} "
+                  f"{c['mse_between_models']:>12.6f} "
+                  f"{c['ssim_between_models']:>12.6f} "
+                  f"{c['baseline_mean_pred']:>10.6f} "
+                  f"{c['dscnn_mean_pred']:>10.6f}")
         print(f"{'=' * 70}")
+
+    # save results
+    out_path = Path("results/generalization_results.json")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        json.dump(results, f, indent=2)
+    print(f"\nResults saved to {out_path}")
 
     return results
 
