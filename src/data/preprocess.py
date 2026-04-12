@@ -104,27 +104,41 @@ def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
     (out_dir / "layouts").mkdir(parents=True, exist_ok=True)
     (out_dir / "masks").mkdir(parents=True, exist_ok=True)
 
-    layout_files = [p for p in layout_dir.iterdir() if p.is_file()]
-    mask_names = {p.name for p in mask_dir.iterdir() if p.is_file()}
+    # only process image files (skip .glp, .gds, etc.)
+    IMAGE_EXTS = {'.png', '.bmp', '.jpg', '.jpeg', '.tif', '.tiff'}
+    layout_files = [p for p in layout_dir.iterdir()
+                    if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
+    mask_files = [p for p in mask_dir.iterdir()
+                  if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
+    mask_names = {p.stem for p in mask_files}  # match by stem (name without extension)
+
+    if not layout_files:
+        print(f"[SKIP] {dataset_name}: no image files in target/ (found {len(list(layout_dir.iterdir()))} non-image files)")
+        return 0
 
     random.shuffle(layout_files)
 
     processed = 0
     skipped = 0
 
+    # build stem -> path mapping for masks
+    mask_by_stem = {p.stem: p for p in mask_files}
+
     for idx, layout_path in enumerate(layout_files):
         if max_samples != -1 and idx >= max_samples:
             print(f"[INFO] {dataset_name}: reached MAX_SAMPLES={max_samples}")
             break
 
-        if layout_path.name not in mask_names:
+        if layout_path.stem not in mask_by_stem:
             skipped += 1
             continue
 
-        process_and_save_image(layout_path, out_dir / "layouts" / layout_path.name,
+        mask_path = mask_by_stem[layout_path.stem]
+        out_name = layout_path.stem + ".png"  # always save as PNG
+
+        process_and_save_image(layout_path, out_dir / "layouts" / out_name,
                                target_size=image_size)
-        process_and_save_image(mask_dir / layout_path.name,
-                               out_dir / "masks" / layout_path.name,
+        process_and_save_image(mask_path, out_dir / "masks" / out_name,
                                target_size=image_size)
         processed += 1
 

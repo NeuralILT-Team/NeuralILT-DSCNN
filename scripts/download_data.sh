@@ -222,11 +222,14 @@ download_benchmarks() {
     echo ">>> Downloading StdMetal and StdContact from LithoBench repo..."
     echo ""
 
-    # Check if already downloaded
+    # Check if already downloaded AND converted to PNG
     if [ -d "${DATA_DIR}/StdMetal/target" ] && [ -d "${DATA_DIR}/StdMetal/litho" ]; then
-        n=$(ls "${DATA_DIR}/StdMetal/target/" 2>/dev/null | wc -l)
-        echo "[OK] StdMetal already exists (${n} tiles) — skipping"
-        return 0
+        png_count=$(ls "${DATA_DIR}/StdMetal/target/"*.png 2>/dev/null | wc -l)
+        if [ "$png_count" -gt 0 ]; then
+            echo "[OK] StdMetal already has PNG files (${png_count} tiles) — skipping"
+            return 0
+        fi
+        echo "[INFO] StdMetal exists but no PNG files — will convert .glp to .png"
     fi
 
     local TEMP_DIR
@@ -308,6 +311,27 @@ download_benchmarks() {
     fi
 
     rm -rf "$TEMP_DIR"
+
+    # Convert .glp files to PNG images
+    echo ""
+    echo ">>> Converting .glp files to PNG..."
+    PYTHON_CMD="python3"
+    if [ -f "venv/bin/python" ]; then
+        PYTHON_CMD="venv/bin/python"
+    fi
+
+    for ds in StdMetal StdContact; do
+        if [ -d "${DATA_DIR}/${ds}/target" ]; then
+            glp_count=$(ls "${DATA_DIR}/${ds}/target/"*.glp 2>/dev/null | wc -l)
+            if [ "$glp_count" -gt 0 ]; then
+                echo "  Converting ${ds} (${glp_count} .glp files)..."
+                $PYTHON_CMD scripts/convert_glp.py "${DATA_DIR}/${ds}" || {
+                    echo "  WARNING: GLP conversion failed for ${ds}"
+                    echo "  Try manually: $PYTHON_CMD scripts/convert_glp.py ${DATA_DIR}/${ds}"
+                }
+            fi
+        fi
+    done
 }
 
 # ─────────────────────────────────────────────────────────────────────

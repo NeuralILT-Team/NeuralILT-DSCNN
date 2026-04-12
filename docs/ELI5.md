@@ -43,11 +43,11 @@ This does roughly the same thing but with **~8× fewer math operations**.
 
 All data comes from [LithoBench](https://github.com/shelljane/lithobench), an open benchmark for lithography research.
 
-| Dataset | Tiles | Purpose | Format |
-|---------|-------|---------|--------|
-| **MetalSet** | 16,423 | Main training + testing | PNG images (2048×2048, resized to 256×256) |
-| **StdMetal** | 271 | Generalization test | PNG images from tarball |
-| **StdContact** | 328 | Cross-domain test | PNG images from tarball |
+| Dataset | Tiles | Purpose | Format | Status |
+|---------|-------|---------|--------|--------|
+| **MetalSet** | 16,423 | Main training + testing | PNG images (2048×2048, resized to 256×256) | Available |
+| **StdMetal** | 271 | Generalization test | `.glp` layout files (no rendered PNGs available) | Future work |
+| **StdContact** | 328 | Cross-domain test | `.glp` layout files (no rendered PNGs available) | Future work |
 
 Each tile has two images:
 - **target/** — the circuit layout (input to the model)

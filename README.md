@@ -42,22 +42,33 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 
 | Step | Priority | Description |
 |------|----------|-------------|
-| **Run experiments on HPC** | 🔴 Critical | Train both models on full MetalSet (16,472 tiles) |
-| **Collect results** | 🔴 Critical | Get MSE/SSIM/EPE/FLOPs numbers for the report |
-| **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
 | **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
 | **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low |
 | **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
+| **Exp 4: Generalization** | 🟢 Future work | StdMetal/StdContact only have `.glp` files — need GDSII renderer |
 
-### Experiment Plan (from proposal)
+### Experiment Results
 
 | Experiment | Description | Status |
 |------------|-------------|--------|
-| **Exp 1**: Baseline | Train standard U-Net on MetalSet | Code ready, needs HPC run |
-| **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet | Code ready, needs HPC run |
-| **Exp 3**: Comparison | Compare accuracy + efficiency metrics | Code ready, needs Exp 1+2 |
-| **Exp 4**: Generalization | Evaluate both on StdMetal/StdContact | Code ready, needs Exp 1+2 |
+| **Exp 1**: Baseline | Train standard U-Net on MetalSet | ✅ Done (50 epochs) |
+| **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet | ✅ Done (50 epochs) |
+| **Exp 3**: Comparison | Compare accuracy + efficiency metrics | ✅ Done — see results below |
+| **Exp 4**: Generalization | Evaluate both on StdMetal/StdContact | ⏳ Future work (`.glp` files need rendering) |
+
+### Experiment 3 Results — Baseline vs DS-CNN on MetalSet
+
+| Metric | Baseline | DS-CNN | Change |
+|--------|----------|--------|--------|
+| MSE ↓ | 0.000059 | 0.000098 | Baseline better |
+| SSIM ↑ | 0.9789 | 0.9665 | -1.3% |
+| EPE ↓ | 0.00222 | 0.00166 | **DS-CNN 25% better** |
+| Params | 31.0M | 6.0M | **5.2× fewer** |
+| FLOPs | 109.3B | 28.5B | **3.8× fewer** |
+| Runtime | 17.7ms | 15.9ms | **1.1× faster** |
+
+**Key finding**: DS-CNN achieves **5.2× parameter reduction** and **3.8× FLOPs reduction** with only 1.3% SSIM drop. Edge placement error is actually **25% better** with DS-CNN.
 
 ---
 
