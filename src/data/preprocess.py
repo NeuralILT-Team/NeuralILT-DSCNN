@@ -110,11 +110,26 @@ def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
     if not layout_files:
         glp_count = sum(1 for f in all_files if f.suffix.lower() == '.glp')
         if glp_count > 0:
-            print(f"[SKIP] {dataset_name}: found {glp_count} .glp files but no images.")
-            print(f"       Run: venv/bin/python scripts/convert_glp.py data/raw/{dataset_name}")
-        else:
+            print(f"[INFO] {dataset_name}: found {glp_count} .glp files — converting to PNG...")
+            import subprocess, sys
+            convert_script = Path(__file__).parent.parent.parent / "scripts" / "convert_glp.py"
+            result = subprocess.run(
+                [sys.executable, str(convert_script), str(raw_path)],
+                capture_output=True, text=True
+            )
+            print(result.stdout)
+            if result.returncode != 0:
+                print(f"[ERROR] GLP conversion failed: {result.stderr}")
+                return 0
+            # re-scan for image files after conversion
+            layout_files = [p for p in layout_dir.iterdir()
+                            if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
+            mask_files = [p for p in mask_dir.iterdir()
+                          if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
+            mask_names = {p.stem for p in mask_files}
+        if not layout_files:
             print(f"[SKIP] {dataset_name}: no image files in target/ ({len(all_files)} files)")
-        return 0
+            return 0
 
     # log what we're doing (use first image file, not .glp)
     orig = Image.open(layout_files[0]).size
