@@ -1,7 +1,9 @@
 # Accelerating Inverse Lithography Technology using Depthwise Separable CNNs
 
-CMPE 257 – Spring 2026  
+CMPE 257 – Spring 2026
 Team: Pooja Singh, Rana Shamoun, Rishi Sheth, Pramod Yadav
+
+> **New here?** Read the [ELI5 Guide](docs/ELI5.md) — explains the project, datasets, pipeline, and every file in plain English.
 
 ---
 
