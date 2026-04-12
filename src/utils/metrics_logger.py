@@ -17,7 +17,12 @@ class MetricsLogger:
         self.csv_path = self.log_dir / f"{name}_metrics.csv"
         self.json_path = self.log_dir / f"{name}_metrics.json"
         self.history = []
-        self._header_written = False
+
+        # If CSV already exists (e.g., resuming training), append to it
+        if self.csv_path.exists() and self.csv_path.stat().st_size > 0:
+            self._header_written = True
+        else:
+            self._header_written = False
 
     def log(self, metrics, step=None):
         entry = {"timestamp": datetime.now().isoformat()}

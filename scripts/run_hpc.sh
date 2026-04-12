@@ -273,6 +273,34 @@ prepare_data() {
     python -m src.data.preprocess --dataset StdMetal 2>/dev/null || true
     python -m src.data.preprocess --dataset StdContact 2>/dev/null || true
 
+    # validate images — remove corrupt PNGs that crash DataLoader
+    echo "Validating processed images..."
+    python -c "
+from pathlib import Path
+from PIL import Image
+for subdir in ['layouts', 'masks']:
+    d = Path('data/processed/MetalSet') / subdir
+    if not d.exists():
+        continue
+    bad = []
+    for f in sorted(d.iterdir()):
+        try:
+            with Image.open(f) as img:
+                img.verify()
+        except Exception:
+            bad.append(f)
+    if bad:
+        print(f'  Removing {len(bad)} corrupt files from {subdir}/')
+        for f in bad:
+            f.unlink()
+            # also remove the counterpart
+            other = Path('data/processed/MetalSet') / ('masks' if subdir == 'layouts' else 'layouts') / f.name
+            if other.exists():
+                other.unlink()
+    else:
+        print(f'  {subdir}/: all files OK')
+" || echo "  (image validation skipped)"
+
     # split MetalSet into train/val/test
     echo "Splitting MetalSet (80/10/10)..."
     python -m src.data.split_data || {

@@ -175,11 +175,15 @@ def train(config, run_name=None, resume_from=None):
     start_epoch = 1
     best_val_loss = float("inf")
     if resume_from and Path(resume_from).exists():
-        meta = load_checkpoint(resume_from, model, optimizer, device=str(device))
+        meta = load_checkpoint(resume_from, model, optimizer, device=str(device),
+                               scheduler=scheduler, scaler=scaler)
         start_epoch = meta.get("epoch", 0) + 1
         best_val_loss = meta.get("loss", float("inf"))
         print(f"Resumed from {resume_from} (epoch {meta.get('epoch', '?')}, loss {best_val_loss:.6f})")
         print(f"Continuing from epoch {start_epoch} to {epochs}")
+        if start_epoch > epochs:
+            print(f"Already trained {start_epoch - 1} epochs (target: {epochs}). Nothing to do.")
+            return best_val_loss
     elif resume_from:
         print(f"WARNING: checkpoint not found at {resume_from} — training from scratch")
 
@@ -216,7 +220,8 @@ def train(config, run_name=None, resume_from=None):
 
         if epoch % save_every == 0 or is_best or epoch == epochs:
             save_checkpoint(model, optimizer, epoch, val_metrics["val_loss"],
-                            Path(ckpt_dir) / f"epoch_{epoch}.pt", is_best=is_best)
+                            Path(ckpt_dir) / f"epoch_{epoch}.pt", is_best=is_best,
+                            scheduler=scheduler, scaler=scaler)
 
     logger.save_json()
     print(f"\nDone! Best val loss: {best_val_loss:.6f}")

@@ -46,6 +46,31 @@ class LithoBenchDataset(Dataset):
             self.files = sorted([f.name for f in self.layout_dir.iterdir()
                                  if f.is_file()])
 
+        # validate files — remove any that can't be opened by PIL
+        # (corrupt PNGs crash the DataLoader mid-training)
+        self._validate_files()
+
+    def _validate_files(self):
+        """Remove corrupt or unreadable files from the file list."""
+        valid = []
+        bad = []
+        for fname in self.files:
+            layout_path = self.layout_dir / fname
+            mask_path = self.mask_dir / fname
+            try:
+                with Image.open(layout_path) as img:
+                    img.verify()
+                with Image.open(mask_path) as img:
+                    img.verify()
+                valid.append(fname)
+            except Exception:
+                bad.append(fname)
+
+        if bad:
+            print(f"WARNING: skipping {len(bad)} corrupt files: {bad[:5]}"
+                  + (f"... and {len(bad)-5} more" if len(bad) > 5 else ""))
+        self.files = valid
+
     def __len__(self):
         return len(self.files)
 

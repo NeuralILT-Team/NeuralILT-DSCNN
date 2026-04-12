@@ -181,22 +181,33 @@ def analyze_training_logs():
         df = pd.read_csv(csv_path)
 
         print(f"\n--- {name} ---")
-        print(f"  Epochs trained: {len(df)}")
+
+        # Use 'step' column for epoch numbers if available
+        if "step" in df.columns:
+            first_epoch = int(df["step"].iloc[0])
+            last_epoch = int(df["step"].iloc[-1])
+            print(f"  Epochs trained: {len(df)} (epoch {first_epoch} to {last_epoch})")
+        else:
+            last_epoch = len(df)
+            print(f"  Epochs trained: {len(df)}")
 
         if "train_loss" in df.columns:
+            best_idx = df["train_loss"].idxmin()
+            best_ep = int(df["step"].iloc[best_idx]) if "step" in df.columns else best_idx + 1
             print(f"  Final train loss: {df['train_loss'].iloc[-1]:.6f}")
-            print(f"  Best train loss:  {df['train_loss'].min():.6f} "
-                  f"(epoch {df['train_loss'].idxmin() + 1})")
+            print(f"  Best train loss:  {df['train_loss'].min():.6f} (epoch {best_ep})")
 
         if "val_loss" in df.columns:
+            best_idx = df["val_loss"].idxmin()
+            best_ep = int(df["step"].iloc[best_idx]) if "step" in df.columns else best_idx + 1
             print(f"  Final val loss:   {df['val_loss'].iloc[-1]:.6f}")
-            print(f"  Best val loss:    {df['val_loss'].min():.6f} "
-                  f"(epoch {df['val_loss'].idxmin() + 1})")
+            print(f"  Best val loss:    {df['val_loss'].min():.6f} (epoch {best_ep})")
 
         if "val_ssim" in df.columns:
+            best_idx = df["val_ssim"].idxmax()
+            best_ep = int(df["step"].iloc[best_idx]) if "step" in df.columns else best_idx + 1
             print(f"  Final val SSIM:   {df['val_ssim'].iloc[-1]:.6f}")
-            print(f"  Best val SSIM:    {df['val_ssim'].max():.6f} "
-                  f"(epoch {df['val_ssim'].idxmax() + 1})")
+            print(f"  Best val SSIM:    {df['val_ssim'].max():.6f} (epoch {best_ep})")
 
         if "val_mse" in df.columns:
             print(f"  Final val MSE:    {df['val_mse'].iloc[-1]:.6f}")
