@@ -94,12 +94,6 @@ def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
         print(f"[SKIP] {dataset_name}: no litho/ directory")
         return 0
 
-    # log what we're doing
-    sample = next(layout_dir.iterdir(), None)
-    if sample:
-        orig = Image.open(sample).size
-        print(f"[INFO] {dataset_name}: original size {orig[0]}x{orig[1]} -> resizing to {image_size}x{image_size}")
-
     # create output dirs
     (out_dir / "layouts").mkdir(parents=True, exist_ok=True)
     (out_dir / "masks").mkdir(parents=True, exist_ok=True)
@@ -112,9 +106,19 @@ def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
                   if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
     mask_names = {p.stem for p in mask_files}  # match by stem (name without extension)
 
+    all_files = list(layout_dir.iterdir())
     if not layout_files:
-        print(f"[SKIP] {dataset_name}: no image files in target/ (found {len(list(layout_dir.iterdir()))} non-image files)")
+        glp_count = sum(1 for f in all_files if f.suffix.lower() == '.glp')
+        if glp_count > 0:
+            print(f"[SKIP] {dataset_name}: found {glp_count} .glp files but no images.")
+            print(f"       Run: venv/bin/python scripts/convert_glp.py data/raw/{dataset_name}")
+        else:
+            print(f"[SKIP] {dataset_name}: no image files in target/ ({len(all_files)} files)")
         return 0
+
+    # log what we're doing (use first image file, not .glp)
+    orig = Image.open(layout_files[0]).size
+    print(f"[INFO] {dataset_name}: {len(layout_files)} images, {orig[0]}x{orig[1]} -> {image_size}x{image_size}")
 
     random.shuffle(layout_files)
 
