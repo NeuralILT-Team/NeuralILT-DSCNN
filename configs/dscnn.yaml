@@ -13,7 +13,7 @@ model:
 # image_size is in configs/data.yaml (single source of truth)
 
 training:
-  epochs: 50
+  epochs: 100
   batch_size: 4           # same as baseline for fair comparison
   learning_rate: 1.0e-4
   weight_decay: 0.0

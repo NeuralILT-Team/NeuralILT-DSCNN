@@ -8,7 +8,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #
 # Email notifications (override with: sbatch --mail-user=other@sjsu.edu ...)
 #SBATCH --mail-type=END,FAIL,TIME_LIMIT
@@ -289,14 +289,24 @@ prepare_data() {
 train_baseline() {
     echo ""
     echo ">>> Training baseline U-Net..."
-    python -m src.train --config configs/baseline.yaml --data-config configs/data.yaml
+    RESUME_FLAG=""
+    if [ -f "results/checkpoints/baseline/best_model.pt" ]; then
+        echo "  Found existing checkpoint — resuming training"
+        RESUME_FLAG="--resume results/checkpoints/baseline/best_model.pt"
+    fi
+    python -m src.train --config configs/baseline.yaml --data-config configs/data.yaml $RESUME_FLAG
     echo "Baseline training done."
 }
 
 train_dscnn() {
     echo ""
     echo ">>> Training DS-CNN U-Net..."
-    python -m src.train --config configs/dscnn.yaml --data-config configs/data.yaml
+    RESUME_FLAG=""
+    if [ -f "results/checkpoints/dscnn/best_model.pt" ]; then
+        echo "  Found existing checkpoint — resuming training"
+        RESUME_FLAG="--resume results/checkpoints/dscnn/best_model.pt"
+    fi
+    python -m src.train --config configs/dscnn.yaml --data-config configs/data.yaml $RESUME_FLAG
     echo "DS-CNN training done."
 }
 

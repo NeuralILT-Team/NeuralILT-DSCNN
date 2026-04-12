@@ -26,7 +26,7 @@ from src.losses import get_loss
 from src.metrics.mse import compute_mse_batch
 from src.metrics.ssim import compute_ssim_batch
 from src.utils.seed import set_seed
-from src.utils.io import load_config, merge_configs, save_checkpoint
+from src.utils.io import load_config, merge_configs, save_checkpoint, load_checkpoint
 from src.utils.metrics_logger import MetricsLogger
 
 
@@ -109,13 +109,14 @@ def validate(model, loader, loss_fn, device, use_amp=False):
     return {"val_loss": total_loss / d, "val_mse": total_mse / d, "val_ssim": total_ssim / d}
 
 
-def train(config, run_name=None):
+def train(config, run_name=None, resume_from=None):
     """
     Main training loop.
 
     Args:
         config: merged config dict
         run_name: optional name suffix for this run (used in sweeps)
+        resume_from: path to checkpoint to resume from (continues training)
     """
     set_seed(config.get("split_seed", 42))
 
@@ -170,6 +171,18 @@ def train(config, run_name=None):
     if accum_steps > 1:
         print(f"Gradient accumulation: {accum_steps} steps (effective batch = {bs * accum_steps})")
 
+    # resume from checkpoint if specified
+    start_epoch = 1
+    best_val_loss = float("inf")
+    if resume_from and Path(resume_from).exists():
+        meta = load_checkpoint(resume_from, model, optimizer, device=str(device))
+        start_epoch = meta.get("epoch", 0) + 1
+        best_val_loss = meta.get("loss", float("inf"))
+        print(f"Resumed from {resume_from} (epoch {meta.get('epoch', '?')}, loss {best_val_loss:.6f})")
+        print(f"Continuing from epoch {start_epoch} to {epochs}")
+    elif resume_from:
+        print(f"WARNING: checkpoint not found at {resume_from} — training from scratch")
+
     # logging
     log_dir = config.get("log_dir", f"results/logs/{model_name}")
     ckpt_dir = config.get("checkpoint_dir", f"results/checkpoints/{model_name}")
@@ -177,11 +190,12 @@ def train(config, run_name=None):
     logger = MetricsLogger(log_dir, name=model_name)
 
     # training loop
-    best_val_loss = float("inf")
     print(f"\nTraining for {epochs} epochs (lr={lr}, batch={bs})...")
+    if start_epoch > 1:
+        print(f"  (resuming from epoch {start_epoch})")
     print("=" * 65)
 
-    for epoch in range(1, epochs + 1):
+    for epoch in range(start_epoch, epochs + 1):
         train_metrics = train_one_epoch(model, train_loader, optimizer,
                                         loss_fn, device, grad_clip,
                                         scaler=scaler, accum_steps=accum_steps)
@@ -273,6 +287,8 @@ def main():
     parser.add_argument("--config", required=True, help="Model config YAML")
     parser.add_argument("--data-config", default="configs/data.yaml",
                         help="Data config YAML")
+    parser.add_argument("--resume", default=None,
+                        help="Resume from checkpoint (e.g., results/checkpoints/baseline/best_model.pt)")
 
     # sweep arguments
     parser.add_argument("--sweep-lr", nargs="+", default=None,
@@ -300,7 +316,7 @@ def main():
     elif args.sweep_batch_size:
         run_sweep(config, "batch_size", args.sweep_batch_size)
     else:
-        train(config)
+        train(config, resume_from=args.resume)
 
 
 if __name__ == "__main__":
