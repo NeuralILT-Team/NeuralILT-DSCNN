@@ -208,11 +208,11 @@ def analyze_training_logs():
             train_trend = np.polyfit(range(10), last_10_train, 1)[0]
             val_trend = np.polyfit(range(10), last_10_val, 1)[0]
             if train_trend < 0 and val_trend > 0:
-                print(f"  ⚠️  Possible overfitting: train loss decreasing but val loss increasing")
+                print(f"  [WARN] Possible overfitting: train loss decreasing but val loss increasing")
             elif val_trend < 0:
-                print(f"  ✓  Still improving (val loss trending down)")
+                print(f"  [OK]   Still improving (val loss trending down)")
             else:
-                print(f"  ~  Converged (val loss stable)")
+                print(f"  [OK]   Converged (val loss stable)")
 
 
 def analyze_comparison():
