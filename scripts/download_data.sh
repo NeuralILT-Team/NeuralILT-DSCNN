@@ -205,10 +205,10 @@ download_metalset() {
         find "${DATA_DIR}/" -maxdepth 3 -type d | head -20
     fi
 
-    # Clean up: delete tarball and any unwanted subsets
+    # Clean up: delete tarball and unwanted subsets (keep StdMetal/StdContact for Exp 4)
     echo ""
     echo "Cleaning up to save disk space..."
-    rm -rf "${DATA_DIR}/ViaSet" "${DATA_DIR}/StdContact" "${DATA_DIR}/ICCAD2013" 2>/dev/null
+    rm -rf "${DATA_DIR}/ViaSet" "${DATA_DIR}/ICCAD2013" 2>/dev/null
     rm -f "$tarball"
     echo "Cleaned up. Remaining:"
     du -sh "${DATA_DIR}/"* 2>/dev/null
