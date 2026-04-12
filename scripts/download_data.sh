@@ -455,20 +455,20 @@ case "$MODE" in
         download_metalset
         ;;
     benchmarks|StdMetal|StdContact)
-        download_stdmetal_from_tarball
+        download_benchmarks
         ;;
     extract)
         extract_tarball
         ;;
     all)
         download_metalset
-        download_stdmetal_from_tarball
+        download_benchmarks
         ;;
     *)
         echo "Usage: bash scripts/download_data.sh [MetalSet|benchmarks|extract|all]"
         echo ""
         echo "  MetalSet    — download main dataset from Google Drive"
-        echo "  benchmarks  — download StdMetal/StdContact (re-downloads tarball if needed)"
+        echo "  benchmarks  — download StdMetal/StdContact from GitHub + convert .glp to .png"
         echo "  extract     — extract a manually uploaded lithodata.tar.gz"
         echo "  all         — download everything"
         exit 1
