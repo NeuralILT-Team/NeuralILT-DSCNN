@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 
 from src.models.blocks import DoubleConv
+from src.models.constants import DEFAULT_FEATURES
 
 
 class UNet(nn.Module):
@@ -25,7 +26,7 @@ class UNet(nn.Module):
         super().__init__()
 
         if features is None:
-            features = [64, 128, 256, 512]
+            features = DEFAULT_FEATURES
 
         # encoder
         self.encoders = nn.ModuleList()
