@@ -1,44 +1,75 @@
 """
-Baseline U-Net for ILT (target → litho)
+Baseline U-Net for NeuralILT (target layout -> optimized mask).
+
+This is a standard 4-level U-Net with skip connections, similar to
+what LithoBench uses for their NeuralILT experiments [Zheng et al., 2023].
+
+Architecture:
+    Encoder: 1 -> 64 -> 128 -> 256 -> 512 (with maxpool between levels)
+    Bottleneck: 512 -> 1024
+    Decoder: mirrors encoder with transposed convs + skip connections
+    Output: 1x1 conv -> sigmoid (mask values in [0,1])
+
+We use this as our baseline to compare against the DS-CNN version.
 """
 
 import torch
 import torch.nn as nn
 
-
-class DoubleConv(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(out_ch, out_ch, 3, padding=1),
-            nn.ReLU(),
-        )
-
-    def forward(self, x):
-        return self.net(x)
+from src.models.blocks import DoubleConv
 
 
 class UNet(nn.Module):
-    def __init__(self):
+
+    def __init__(self, in_channels=1, out_channels=1, features=None):
         super().__init__()
 
-        self.enc1 = DoubleConv(1, 64)
-        self.pool = nn.MaxPool2d(2)
-        self.enc2 = DoubleConv(64, 128)
+        if features is None:
+            features = [64, 128, 256, 512]
 
-        self.up = nn.ConvTranspose2d(128, 64, 2, stride=2)
-        self.dec1 = DoubleConv(128, 64)
+        # encoder
+        self.encoders = nn.ModuleList()
+        self.pools = nn.ModuleList()
+        ch = in_channels
+        for f in features:
+            self.encoders.append(DoubleConv(ch, f))
+            self.pools.append(nn.MaxPool2d(2))
+            ch = f
 
-        self.out = nn.Conv2d(64, 1, 1)
+        # bottleneck
+        self.bottleneck = DoubleConv(features[-1], features[-1] * 2)
+
+        # decoder
+        self.upconvs = nn.ModuleList()
+        self.decoders = nn.ModuleList()
+        reversed_features = list(reversed(features))
+        ch = features[-1] * 2
+        for f in reversed_features:
+            self.upconvs.append(nn.ConvTranspose2d(ch, f, 2, stride=2))
+            self.decoders.append(DoubleConv(f * 2, f))  # *2 because of skip concat
+            ch = f
+
+        self.final = nn.Conv2d(features[0], out_channels, 1)
 
     def forward(self, x):
-        x1 = self.enc1(x)
-        x2 = self.enc2(self.pool(x1))
+        # save encoder outputs for skip connections
+        skip_connections = []
+        for enc, pool in zip(self.encoders, self.pools):
+            x = enc(x)
+            skip_connections.append(x)
+            x = pool(x)
 
-        x = self.up(x2)
-        x = torch.cat([x, x1], dim=1)
-        x = self.dec1(x)
+        x = self.bottleneck(x)
 
-        return torch.sigmoid(self.out(x))
+        # decoder with skip connections (reverse order)
+        skip_connections = skip_connections[::-1]
+        for up, dec, skip in zip(self.upconvs, self.decoders, skip_connections):
+            x = up(x)
+            # handle odd-sized feature maps
+            if x.shape != skip.shape:
+                x = nn.functional.interpolate(x, size=skip.shape[2:],
+                                              mode='bilinear', align_corners=False)
+            x = torch.cat([x, skip], dim=1)
+            x = dec(x)
+
+        return torch.sigmoid(self.final(x))
