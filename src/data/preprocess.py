@@ -1,166 +1,149 @@
 """
-Purpose:
-    This script prepares the LithoBench dataset for model training.
+Preprocessing script for LithoBench datasets.
 
-What this script does:
-    1. Looks for a compressed dataset archive in data/raw/ (for example: lithodata.tar.gz)
-    2. Extracts the archive if it has not already been extracted
-    3. Searches the extracted contents to find the MetalSet folder
-    4. Reads layout and mask images
-    5. Converts them to single-channel grayscale
-    6. Normalizes pixel values into [0, 1]
-    7. Saves them into data/processed/MetalSet/layouts and masks
+Handles multiple dataset subsets:
+  - MetalSet (16,472 tiles) — primary training/eval dataset
+  - StdMetal (271 tiles) — out-of-distribution generalization test
+  - StdContact (328 tiles) — optional cross-domain test
 
-Why this script is useful:
-    - Keeps raw data untouched
-    - Makes preprocessing reproducible
-    - Avoids repeated manual extraction steps
-    - Creates a clean training-ready dataset structure
-
-Inputs:
-    - data/raw/lithodata.tar.gz   (or another .tar / .tar.gz archive)
-      OR
-    - an already extracted dataset folder under data/raw/
-
-Outputs:
-    - data/processed/MetalSet/layouts/
-    - data/processed/MetalSet/masks/
-
-How to run:
-    python -m src.data.preprocess
-
-Important notes:
-    - This script does NOT push raw data to GitHub
-    - This script assumes the dataset contains a folder named "MetalSet"
-    - This script preserves filenames so layout-mask pairing remains consistent
-"""
-
-"""
-Preprocessing script for LithoBench MetalSet dataset
-
-Aligned with CMPE 257 project proposal:
-- Input:  target (layout)
-- Output: litho (mask)
-- Task: image-to-image mapping (Neural ILT)
-
-Supports:
-- Local subset training (e.g., 5000 samples)
-- Full dataset training (teammates / GPU)
+Each subset has target/ (layouts) and litho/ (masks) subdirectories.
+This script converts them to grayscale, resizes to image_size (from
+configs/data.yaml), and saves to data/processed/.
 
 Run:
-    python -m src.data.preprocess
-    MAX_SAMPLES=5000 python -m src.data.preprocess
+    python -m src.data.preprocess                    # MetalSet only
+    python -m src.data.preprocess --all              # all datasets
+    python -m src.data.preprocess --dataset StdMetal  # specific dataset
+    MAX_SAMPLES=5000 python -m src.data.preprocess   # subset for local dev
 """
 
+import argparse
 from pathlib import Path
 import os
 import random
 import numpy as np
+import yaml
 from PIL import Image
 
-# -----------------------------------------------------------------------------
-# CONFIG
-# -----------------------------------------------------------------------------
 RAW_DIR = Path("data/raw")
-PROCESSED_DIR = Path("data/processed/MetalSet")
+PROCESSED_BASE = Path("data/processed")
+DATA_CONFIG = Path("configs/data.yaml")
 
-# -1 → FULL dataset (for teammates)
-# 5000 → your local run
+# all LithoBench subsets we support
+DATASETS = {
+    "MetalSet": {"target": "target", "litho": "litho"},
+    "StdMetal": {"target": "target", "litho": "litho"},
+    "StdContact": {"target": "target", "litho": "litho"},
+}
+
 MAX_SAMPLES = int(os.getenv("MAX_SAMPLES", -1))
 
 
-# -----------------------------------------------------------------------------
-# CREATE OUTPUT DIRS
-# -----------------------------------------------------------------------------
-def create_output_dirs():
-    (PROCESSED_DIR / "layouts").mkdir(parents=True, exist_ok=True)
-    (PROCESSED_DIR / "masks").mkdir(parents=True, exist_ok=True)
+def get_image_size():
+    """Read image_size from configs/data.yaml (single source of truth)."""
+    if DATA_CONFIG.exists():
+        with open(DATA_CONFIG) as f:
+            cfg = yaml.safe_load(f)
+        return cfg.get("image_size", 256)
+    return 256
 
 
-# -----------------------------------------------------------------------------
-# PROCESS ONE IMAGE
-# -----------------------------------------------------------------------------
-def process_and_save_image(input_path: Path, output_path: Path):
-    """
-    Convert image to grayscale + normalize [0,1] + save
-    """
+def process_and_save_image(input_path, output_path, target_size=None):
+    """Convert to grayscale, resize to target_size, save."""
+    if target_size is None:
+        target_size = get_image_size()
     image = Image.open(input_path).convert("L")
-
-    array = np.array(image, dtype=np.float32)
-    array = array / 255.0
-
+    if image.size[0] != target_size or image.size[1] != target_size:
+        image = image.resize((target_size, target_size), Image.BILINEAR)
+    array = np.array(image, dtype=np.float32) / 255.0
     output = (array * 255).astype(np.uint8)
     Image.fromarray(output).save(output_path)
 
 
-# -----------------------------------------------------------------------------
-# MAIN PREPROCESS LOOP
-# -----------------------------------------------------------------------------
-def preprocess(layout_dir: Path, mask_dir: Path):
+def preprocess_dataset(dataset_name, max_samples=-1, image_size=None):
+    """Preprocess a single dataset subset."""
+    if image_size is None:
+        image_size = get_image_size()
+
+    raw_path = RAW_DIR / dataset_name
+    out_dir = PROCESSED_BASE / dataset_name
+
+    if not raw_path.exists():
+        print(f"[SKIP] {dataset_name}: not found at {raw_path}")
+        return 0
+
+    layout_dir = raw_path / "target"
+    mask_dir = raw_path / "litho"
+
+    if not layout_dir.exists():
+        print(f"[SKIP] {dataset_name}: no target/ directory")
+        return 0
+    if not mask_dir.exists():
+        print(f"[SKIP] {dataset_name}: no litho/ directory")
+        return 0
+
+    # log what we're doing
+    sample = next(layout_dir.iterdir(), None)
+    if sample:
+        orig = Image.open(sample).size
+        print(f"[INFO] {dataset_name}: original size {orig[0]}x{orig[1]} -> resizing to {image_size}x{image_size}")
+
+    # create output dirs
+    (out_dir / "layouts").mkdir(parents=True, exist_ok=True)
+    (out_dir / "masks").mkdir(parents=True, exist_ok=True)
+
     layout_files = [p for p in layout_dir.iterdir() if p.is_file()]
     mask_names = {p.name for p in mask_dir.iterdir() if p.is_file()}
 
-    # Shuffle → important for subset diversity
     random.shuffle(layout_files)
 
     processed = 0
     skipped = 0
 
     for idx, layout_path in enumerate(layout_files):
-
-        # LIMIT CONTROL (key for your setup)
-        if MAX_SAMPLES != -1 and idx >= MAX_SAMPLES:
-            print(f"[INFO] Reached MAX_SAMPLES={MAX_SAMPLES}")
+        if max_samples != -1 and idx >= max_samples:
+            print(f"[INFO] {dataset_name}: reached MAX_SAMPLES={max_samples}")
             break
-
-        mask_path = mask_dir / layout_path.name
 
         if layout_path.name not in mask_names:
             skipped += 1
             continue
 
-        out_layout = PROCESSED_DIR / "layouts" / layout_path.name
-        out_mask = PROCESSED_DIR / "masks" / mask_path.name
-
-        process_and_save_image(layout_path, out_layout)
-        process_and_save_image(mask_path, out_mask)
-
+        process_and_save_image(layout_path, out_dir / "layouts" / layout_path.name,
+                               target_size=image_size)
+        process_and_save_image(mask_dir / layout_path.name,
+                               out_dir / "masks" / layout_path.name,
+                               target_size=image_size)
         processed += 1
 
         if processed % 500 == 0:
-            print(f"[INFO] Processed {processed} pairs")
+            print(f"[INFO] {dataset_name}: processed {processed} pairs")
 
-    print(f"\n[FINAL]")
-    print(f"Processed: {processed}")
-    print(f"Skipped:   {skipped}")
+    print(f"[DONE] {dataset_name}: {processed} processed, {skipped} skipped (output: {image_size}x{image_size})")
+    return processed
 
 
-# -----------------------------------------------------------------------------
-# ENTRY POINT
-# -----------------------------------------------------------------------------
 def main():
-    """
-    Uses already extracted dataset:
-    data/raw/MetalSet/
-        ├── target/
-        ├── litho/
-    """
+    parser = argparse.ArgumentParser(description="Preprocess LithoBench datasets")
+    parser.add_argument("--dataset", type=str, default="MetalSet",
+                        help="Dataset to preprocess (MetalSet, StdMetal, StdContact)")
+    parser.add_argument("--all", action="store_true",
+                        help="Preprocess all available datasets")
+    args = parser.parse_args()
 
-    metalset_path = RAW_DIR / "MetalSet"
+    image_size = get_image_size()
+    print(f"Image size: {image_size}x{image_size} (from {DATA_CONFIG})")
 
-    layout_dir = metalset_path / "target"
-    mask_dir = metalset_path / "litho"
+    if args.all:
+        print("Preprocessing all available datasets...")
+        total = 0
+        for name in DATASETS:
+            total += preprocess_dataset(name, MAX_SAMPLES, image_size=image_size)
+        print(f"\nTotal: {total} pairs processed across all datasets")
+    else:
+        preprocess_dataset(args.dataset, MAX_SAMPLES, image_size=image_size)
 
-    if not layout_dir.exists():
-        raise FileNotFoundError(f"Missing target folder: {layout_dir}")
-
-    if not mask_dir.exists():
-        raise FileNotFoundError(f"Missing litho folder: {mask_dir}")
-
-    create_output_dirs()
-    preprocess(layout_dir, mask_dir)
-
-    print("\n[INFO] Preprocessing completed successfully")
+    print("\nPreprocessing complete.")
 
 
 if __name__ == "__main__":
