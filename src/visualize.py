@@ -143,12 +143,75 @@ def plot_efficiency_comparison(results_path, output_path="results/efficiency.png
     print(f"Saved efficiency comparison to {output_path}")
 
 
+def plot_prediction_grids(checkpoint_path, config_path, output_path="results/prediction_grids.png"):
+    """Generate prediction grids showing input, ground truth, and predictions."""
+    if not HAS_MPL:
+        return
+
+    import torch
+    from src.models.common import build_model
+    from src.data.dataset import get_dataloaders
+    from src.utils.io import load_config, load_checkpoint
+
+    # Load model
+    config = load_config(config_path)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = build_model(config)
+    load_checkpoint(checkpoint_path, model, device=str(device))
+    model = model.to(device)
+    model.eval()
+
+    # Get test data
+    _, _, test_loader = get_dataloaders(config)
+    layouts, masks = next(iter(test_loader))
+    layouts, masks = layouts[:4].to(device), masks[:4].to(device)  # Show first 4 samples
+
+    with torch.no_grad():
+        preds = model(layouts)
+
+    # Convert to numpy for plotting
+    layouts = layouts.cpu().numpy().squeeze(1)
+    masks = masks.cpu().numpy().squeeze(1)
+    preds = preds.cpu().numpy().squeeze(1)
+
+    # Create figure
+    fig, axes = plt.subplots(4, 3, figsize=(12, 16))
+
+    titles = ["Input Layout", "Ground Truth", "Prediction"]
+    model_name = config.get("model", {}).get("name", "Model")
+
+    for i in range(4):
+        # Input layout
+        axes[i, 0].imshow(layouts[i], cmap='gray', vmin=0, vmax=1)
+        axes[i, 0].set_title(f"Sample {i+1}: Input Layout")
+        axes[i, 0].axis('off')
+
+        # Ground truth
+        axes[i, 1].imshow(masks[i], cmap='gray', vmin=0, vmax=1)
+        axes[i, 1].set_title(f"Sample {i+1}: Ground Truth")
+        axes[i, 1].axis('off')
+
+        # Prediction
+        axes[i, 2].imshow(preds[i], cmap='gray', vmin=0, vmax=1)
+        axes[i, 2].set_title(f"Sample {i+1}: {model_name.upper()} Prediction")
+        axes[i, 2].axis('off')
+
+    plt.suptitle(f"NeuralILT Prediction Results - {model_name.upper()}", fontsize=16)
+    plt.tight_layout()
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"Saved prediction grids to {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", required=True,
                         choices=["curves", "efficiency", "predictions"])
     parser.add_argument("--log-dir", default="results/logs")
-    parser.add_argument("--results", default="results/eval_results.json")
+    parser.add_argument("--results", default="results/comparison.json")
+    parser.add_argument("--checkpoint", default="results/checkpoints/dscnn/best_model.pt")
+    parser.add_argument("--config", default="configs/dscnn.yaml")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -156,9 +219,10 @@ def main():
         plot_training_curves(args.log_dir, args.output or "results/training_curves.png")
     elif args.mode == "efficiency":
         plot_efficiency_comparison(args.results,
-                                   args.output or "results/efficiency.png")
+                                   args.output or "results/efficiency_comparison.png")
     elif args.mode == "predictions":
-        print("Use plot_predictions() programmatically with loaded data.")
+        plot_prediction_grids(args.checkpoint, args.config,
+                              args.output or "results/prediction_grids.png")
 
 
 if __name__ == "__main__":

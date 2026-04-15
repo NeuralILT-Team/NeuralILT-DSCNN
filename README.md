@@ -48,6 +48,48 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 | **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low |
 | **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
 
+---
+
+## Instructions to perform the following tasks:
+
+###  Run Complete Workflow (Training + Figures)
+```bash
+# Run everything: train models, evaluate, generate figures
+bash scripts/run_complete_workflow.sh
+```
+
+This will:
+- Train baseline U-Net and DS-CNN models
+- Evaluate both models on test set
+- Generate training curves, efficiency charts, and prediction grids
+
+#### Training Curves
+```bash
+python -m src.visualize --mode curves --log-dir results/logs --output results/training_curves.png
+```
+
+#### Efficiency Charts
+```bash
+python -m src.visualize --mode efficiency --results results/comparison.json --output results/efficiency_comparison.png
+```
+
+#### Prediction Grids
+```bash
+python -m src.visualize --mode predictions --checkpoint results/checkpoints/dscnn/best_model.pt --config configs/dscnn.yaml --output results/prediction_grids.png
+```
+
+###  Learning Rate Sweep
+```bash
+# Try different learning rates if accuracy is low
+bash scripts/run_lr_sweep.sh
+```
+
+###  Wider DS-CNN Experiment
+```bash
+# Try wider channel dimensions
+bash scripts/run_wider_dscnn.sh
+```
+
 ### Experiment Plan (from proposal)
 
 | Experiment | Description | Status |
