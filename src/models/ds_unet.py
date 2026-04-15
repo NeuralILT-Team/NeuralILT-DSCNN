@@ -30,7 +30,6 @@ class DSUNet(nn.Module):
         if features is None:
             features = DEFAULT_FEATURES
 
-
         # encoder — same structure as baseline but with DS conv blocks
         self.encoders = nn.ModuleList()
         self.pools = nn.ModuleList()
@@ -69,4 +68,9 @@ class DSUNet(nn.Module):
         for up, dec, skip in zip(self.upconvs, self.decoders, skip_connections):
             x = up(x)
             if x.shape != skip.shape:
-       
+                x = nn.functional.interpolate(x, size=skip.shape[2:],
+                                              mode='bilinear', align_corners=False)
+            x = torch.cat([x, skip], dim=1)
+            x = dec(x)
+
+        return torch.sigmoid(self.final(x))
