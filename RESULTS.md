@@ -1,6 +1,5 @@
 # Experimental Results: Neural ILT with Depthwise Separable CNNs
-
-**Date**: April 2026  
+ 
 **Models Compared**: Baseline U-Net vs. DS-CNN U-Net  
 **Dataset**: LithoBench MetalSet  
 **Epochs**: 70 (with previous 20-epoch baseline for reference)
@@ -9,7 +8,7 @@
 
 ## Executive Summary
 
-We trained and evaluated two alternative architectures for Inverse Lithography Technology (ILT) mask prediction:
+Training and evaluation for two architectures of Inveser Lithography Technology mask prediction:
 
 - **Baseline U-Net**: Standard 4-level encoder-decoder with 3×3 convolutions (31.0M parameters)
 - **DS-CNN U-Net**: Depthwise separable convolutions with equivalent structure (6.0M parameters)
@@ -159,7 +158,7 @@ Final training metrics (last 7 epochs):
 
 ### 🎯 Key Findings
 
-- **Depthwise separable convolutions are effective** for ILT mask prediction, confirming the hypothesis from the project proposal
+- **Depthwise separable convolutions are effective** the results confirmed the hypothesis of our project proposal. 
 - **Trade-off is favorable**: The 0.64% SSIM reduction is worth the 80% parameter savings for deployment scenarios
 - **DS-CNN generalizes well**: Consistent performance across validation epochs indicates robust learning
 
@@ -238,10 +237,3 @@ Final training metrics (last 7 epochs):
 
 ---
 
-## Next Steps
-
-- [ ] Generate training curves visualization
-- [ ] Create efficiency comparison charts
-- [ ] Generate prediction grids for qualitative evaluation
-- [ ] Test generalization on StdMetal/StdContact (Experiment 4)
-- [ ] Prepare final report with figures
