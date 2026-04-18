@@ -47,7 +47,7 @@ Detailed experiment results, comparisons, and visualization summaries are availa
 | **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
 | **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids — Documented in [RESULTS.md](RESULTS.md) |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
-| **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low | — Documented in [RESULTS.md](RESULTS.md) |
+| **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low — See [RESULTS.md](RESULTS.md) |
 | **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
 
 ---
@@ -240,7 +240,7 @@ python -m src.train --config configs/dscnn.yaml \
 python -m src.train --config configs/dscnn.yaml --sweep-epochs 25 50 100
 ```
 
-Each sweep value gets its own checkpoint and log directory. A summary table is printed at the end ranking by validation loss.
+Each sweep value gets its own checkpoint and log directory. A summary table is printed at the end ranking by validation loss. The full LR sweep results are documented in [RESULTS.md](RESULTS.md).
 
 ---
 
