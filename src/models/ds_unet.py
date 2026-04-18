@@ -19,6 +19,8 @@ import torch
 import torch.nn as nn
 
 from src.models.blocks import DoubleConvDS
+from src.models.constants import DEFAULT_FEATURES
+
 
 
 class DSUNet(nn.Module):
@@ -26,12 +28,8 @@ class DSUNet(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, features=None):
         super().__init__()
 
-        if features is None:
-<<<<<<< HEAD
-            features = [64, 128, 256, 512]
-=======
+        if features is None
             features = DEFAULT_FEATURES
->>>>>>> dea7b80ad3f7a7da6e1907e90b3e42b88a989c2d
 
         # encoder — same structure as baseline but with DS conv blocks
         self.encoders = nn.ModuleList()
@@ -76,8 +74,4 @@ class DSUNet(nn.Module):
             x = torch.cat([x, skip], dim=1)
             x = dec(x)
 
-<<<<<<< HEAD
         return torch.sigmoid(self.final(x))
-=======
-        return torch.sigmoid(self.final(x))
->>>>>>> dea7b80ad3f7a7da6e1907e90b3e42b88a989c2d

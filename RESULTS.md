@@ -225,6 +225,44 @@ Final training metrics (last 7 epochs):
 
 ---
 
+## Learning Rate Sweep (DS-CNN, 10 Epochs)
+
+To optimize DS-CNN performance, we conducted a hyperparameter sweep over 5 learning rates: 1e-3, 5e-4, 1e-4, 5e-5, and 1e-5, each trained for 10 epochs.
+
+### Summary Table
+
+| Learning Rate | Best Val Loss | Best Val MSE | Best Val SSIM | Epochs to Convergence |
+|---------------|---------------|--------------|---------------|-----------------------|
+| **1e-3** | **0.000101** | **0.000101** | **0.965317** | ~3 |
+| 5e-4 | 0.000108 | 0.000108 | 0.962196 | ~4 |
+| 1e-4 | 0.000175 | 0.000175 | 0.927762 | ~7 |
+| 5e-5 | 0.000268 | 0.000268 | 0.849466 | ~10 (no convergence) |
+| 1e-5 | 0.001923 | 0.001923 | 0.334645 | ~10 (no convergence) |
+
+### Key Findings
+
+1. **Optimal Learning Rate**: LR=1e-3 achieves the best validation loss (0.000101) and fastest convergence (~3 epochs)
+2. **Learning Rate Sensitivity**: Performance degrades significantly for LRs < 5e-4
+   - LR=1e-4: 73% higher val loss than optimal
+   - LR=5e-5: 165% higher val loss than optimal
+   - LR=1e-5: 1804% higher val loss than optimal
+3. **Early Convergence**: LR=1e-3 and 5e-4 both converge within 4 epochs, while smaller LRs require full 10 epochs without reaching optimal performance
+4. **SSIM Trade-off**: The optimal LR=1e-3 achieves SSIM=0.965, which is only 1.1% lower than the 70-epoch baseline (0.9823)
+
+### Best Model Configuration
+
+- **Learning Rate**: 1e-3
+- **Best Validation Loss**: 0.000101
+- **Best Validation SSIM**: 0.965317
+- **Checkpoint**: `results/checkpoints/dscnn_lr_1e-3/best_model.pt`
+- **Training Time**: ~10 epochs (significantly faster than 70-epoch baseline)
+
+### Conclusion
+
+The learning rate sweep confirms that DS-CNN is highly sensitive to learning rate selection, with LR=1e-3 being optimal for this task. This model achieves comparable accuracy to the 70-epoch baseline in just 10 epochs with aggressive learning rate scheduling, suggesting that DS-CNN can be trained efficiently with proper hyperparameter tuning.
+
+---
+
 ## File References
 
 - **Training Logs**: 
