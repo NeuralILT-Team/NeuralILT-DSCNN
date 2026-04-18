@@ -22,7 +22,6 @@ from src.models.blocks import DoubleConvDS
 from src.models.constants import DEFAULT_FEATURES
 
 
-
 class DSUNet(nn.Module):
 
     def __init__(self, in_channels=1, out_channels=1, features=None):
@@ -73,4 +72,5 @@ class DSUNet(nn.Module):
                                               mode='bilinear', align_corners=False)
             x = torch.cat([x, skip], dim=1)
             x = dec(x)
+
         return torch.sigmoid(self.final(x))
