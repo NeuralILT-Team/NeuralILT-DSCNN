@@ -28,7 +28,7 @@ class DSUNet(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, features=None):
         super().__init__()
 
-        if features is None
+        if features is None:
             features = DEFAULT_FEATURES
 
         # encoder — same structure as baseline but with DS conv blocks
@@ -73,5 +73,4 @@ class DSUNet(nn.Module):
                                               mode='bilinear', align_corners=False)
             x = torch.cat([x, skip], dim=1)
             x = dec(x)
-
         return torch.sigmoid(self.final(x))
