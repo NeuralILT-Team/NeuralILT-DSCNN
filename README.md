@@ -18,6 +18,8 @@ We compare two architectures on the [LithoBench MetalSet](https://github.com/she
 
 The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filtering per channel) followed by a 1×1 pointwise conv (channel mixing). This is the same idea behind MobileNet [Howard et al., 2017] — for a 3×3 kernel with 64 output channels, it reduces FLOPs by roughly 8×.
 
+> Detailed experiment results, comparisons, and visualization summaries are available in `RESULTS.md`.
+
 ---
 
 ## Project Status
@@ -41,7 +43,7 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 | Step | Priority | Description |
 |------|----------|-------------|
 | **Run experiments on HPC** | 🔴 Critical | Train both models on full MetalSet (16,472 tiles) |
-| **Collect results** | 🔴 Critical | Get MSE/SSIM/EPE/FLOPs numbers for the report |
+| **Collect results** | 🔴 Critical | Get MSE/SSIM/EPE/FLOPs numbers for the report — See `RESULTS.md` |
 | **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
 | **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
