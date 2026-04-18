@@ -45,7 +45,7 @@ The DS-CNN replaces each standard 3×3 conv with a depthwise conv (spatial filte
 | **Run experiments on HPC** | 🔴 Critical | Train both models on full MetalSet (16,472 tiles) |
 | **Collect results** | 🔴 Critical | Get MSE/SSIM/EPE/FLOPs numbers for the report — See [RESULTS.md](RESULTS.md) |
 | **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
-| **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids |
+| **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids — Documented in [RESULTS.md](RESULTS.md) |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
 | **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low |
 | **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
