@@ -206,7 +206,7 @@ Final training metrics (last 7 epochs):
 - This confirms the DS-CNN design achieves roughly **80% fewer parameters** and **74% fewer FLOPs**.
 - The efficiency gain is especially meaningful for deployment, where lower compute and memory footprints reduce inference latency and hardware requirements.
 
-**Interpretation**: The efficiency chart reinforces the main conclusion that DS-CNN is substantially more lightweight than the Baseline model, making it the better candidate for real-time or resource-constrained ILT inference.
+**Interpretation**: The efficiency comparison chart shown above make it clear that DSCNN is more lightweight than the baseline model. The results show that DSCNN is better candidate for real-time or resource-constrained ILT inference.
 
 ---
 
@@ -221,13 +221,13 @@ Final training metrics (last 7 epochs):
 - It visually confirms that the DS-CNN model captures the overall mask structure and preserves key features despite its much smaller size.
 - Differences are most visible in fine edge details, which is expected given the model’s aggressive parameter reduction.
 
-**Interpretation**: The prediction grid demonstrates that DS-CNN produces high-quality approximations of the target ILT mask while offering a much lighter and faster model for deployment.
+**Interpretation**: The prediction grid shows that DSCNN produces high-quality approximations of the target ILT mask.
 
 ---
 
 ## Learning Rate Sweep (DS-CNN, 10 Epochs)
 
-To optimize DS-CNN performance, we conducted a hyperparameter sweep over 5 learning rates: 1e-3, 5e-4, 1e-4, 5e-5, and 1e-5, each trained for 10 epochs.
+To optimize DSCNN performance, we did the experiment using 5 different learning reates: 1e-3, 5e-4, 1e-4, 5e-5, and 1e-5, each trained for 10 epochs.
 
 ### Summary Table
 
@@ -259,7 +259,7 @@ To optimize DS-CNN performance, we conducted a hyperparameter sweep over 5 learn
 
 ### Conclusion
 
-The learning rate sweep confirms that DS-CNN is highly sensitive to learning rate selection, with LR=1e-3 being optimal for this task. This model achieves comparable accuracy to the 70-epoch baseline in just 10 epochs with aggressive learning rate scheduling, suggesting that DS-CNN can be trained efficiently with proper hyperparameter tuning.
+Experiment with different learning rate makes it clear that DSCNN is highly sensitive to learning rate selection, with LR=1e-3 being optimal for this task. We can conclude that DSCNN can be trained efficiently with proper hyperparameter tuning. 
 
 ---
 
