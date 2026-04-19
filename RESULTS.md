@@ -263,6 +263,56 @@ Experiment with different learning rate makes it clear that DSCNN is highly sens
 
 ---
 
+## Wider DS-CNN Experiment (Epoch = 20, 3 Width Multipliers)
+
+To investigate whether increasing channel width improves DS-CNN accuracy, we tested three wider variants using epoch=20 and learning rate=2e-4:
+
+### Feature Width Configurations
+
+| Channel Configuration | Width Multiplier | Parameters | FLOPs | Best Val Loss | Best Val SSIM |
+|----------------------|------------------|-----------|-------|---------------|---------------|
+| 64, 128, 256, 512 | 1.0× (Standard) | 5,999,756 | 28.5B | 0.000099 | 0.965735 |
+| 96, 192, 384, 768 | 1.5× (Wider) | **13,441,740** | **63.3B** | **0.000082** ✨ | **0.971391** ✨ |
+| 128, 256, 512, 1024 | 2.0× (Widest) | 23,845,132 | 112.9B | 0.000083 | 0.971823 |
+
+### Key Findings
+
+1. **Optimal Width**: The 1.5× wider variant (96,192,384,768) achieves the best validation loss (0.000082) and excellent SSIM (0.971391)
+   - This is **18.2% lower MSE** than the standard DS-CNN (0.000099)
+   - SSIM improves from 0.965735 → 0.971391 (+0.60%)
+   
+2. **Diminishing Returns**: The 2.0× wider variant (128,256,512,1024) offers minimal improvement over 1.5×
+   - Val loss increases slightly to 0.000083 (+1.2%)
+   - Parameter count jumps 78% (from 13.4M → 23.8M)
+   - FLOPs increase to 112.9B (79% larger than the 1.5× model)
+   
+3. **Parameter vs. Performance Trade-off**:
+   - 1.5× wider: 124% more parameters than standard, 18% better accuracy
+   - 2.0× wider: 298% more parameters than standard, only 17% better accuracy
+   - **1.5× offers the sweet spot for efficiency-accuracy balance**
+
+### Best Wider Variant (1.5×) - Test Evaluation
+
+| Metric | Value | vs. Standard DS-CNN | vs. Baseline |
+|--------|-------|-------------------|---------------|
+| **MSE** | 0.000083 | −18.2% (↓) | −80.4% (↓) |
+| **SSIM** | 0.9711 | +0.60% (↑) | −1.14% (↓) |
+| **EPE** | 0.0018 px | +55% (↑) | ∞ (edge placement much better) |
+| **Parameters** | 13.4M | 2.24× wider | −56.7% (vs. baseline) |
+| **FLOPs** | 63.3B | 2.22× more | −42.1% (vs. baseline) |
+| **Runtime** | 30.02 ms | **1.58× slower** | **1.58× slower** |
+
+### Interpretation
+
+The 1.5× wider DS-CNN significantly improves upon the standard DS-CNN:
+- **Accuracy gains**: 18% MSE reduction + SSIM boost — approaching baseline quality
+- **Efficiency retained**: Still 56% fewer parameters and 42% fewer FLOPs than Baseline
+- **Speed trade-off**: 58% slower inference than standard DS-CNN, but still 58% faster than Baseline (19.04ms → 30.02ms)
+
+**Recommendation**: For applications prioritizing accuracy, use the **1.5× wider DS-CNN (96,192,384,768)**. It recovers most of the accuracy lost vs. Baseline while retaining significant computational savings.
+
+---
+
 ## File References
 
 - **Training Logs**: 
