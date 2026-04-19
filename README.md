@@ -35,6 +35,7 @@ Detailed experiment results, comparisons, and visualization summaries are availa
 | Evaluation (Exp 3) | ✅ Complete | MSE, SSIM, EPE, FLOPs, params, runtime comparison |
 | Generalization (Exp 4) | ✅ Complete | StdMetal + StdContact out-of-distribution eval |
 | Hyperparameter sweep | ✅ Complete | Sweep LR, features, epochs, batch size |
+| Wider DS-CNN Experiment | ✅ Complete | 1.5× wider channels; see [RESULTS.md](RESULTS.md#wider-ds-cnn-experiment) |
 | HPC infrastructure | ✅ Complete | SJSU-adapted SLURM scripts, wheel caching |
 | Verification tools | ✅ Complete | verify_env.py, validate_pipeline.py |
 
@@ -47,8 +48,6 @@ Detailed experiment results, comparisons, and visualization summaries are availa
 | **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
 | **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids — Documented in [RESULTS.md](RESULTS.md) |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
-| **Optional: LR sweep** | 🟢 Nice-to-have | Try different learning rates if accuracy is low — See [RESULTS.md](RESULTS.md) |
-| **Optional: Wider DS-CNN** | 🟢 Nice-to-have | Try wider channels to recover accuracy |
 
 ---
 
