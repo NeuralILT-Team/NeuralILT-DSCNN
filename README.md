@@ -38,15 +38,15 @@ Detailed experiment results, comparisons, and visualization summaries are availa
 | Wider DS-CNN Experiment | ✅ Complete | 1.5× wider channels; see [RESULTS.md](RESULTS.md#wider-ds-cnn-experiment) |
 | HPC infrastructure | ✅ Complete | SJSU-adapted SLURM scripts, wheel caching |
 | Verification tools | ✅ Complete | verify_env.py, validate_pipeline.py |
+| Collect results | ✅ Complete | Get MSE/SSIM/EPE/FLOPs numbers for the report — See [RESULTS.md](RESULTS.md) |
+| Generate figures | ✅ Complete | Training curves, efficiency charts, prediction grids — Documented in [RESULTS.md](RESULTS.md) |
 
 ### What's Next 🔜
 
 | Step | Priority | Description |
 |------|----------|-------------|
 | **Run experiments on HPC** | 🔴 Critical | Train both models on full MetalSet (16,472 tiles) |
-| **Collect results** | 🔴 Critical | Get MSE/SSIM/EPE/FLOPs numbers for the report — See [RESULTS.md](RESULTS.md) |
 | **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
-| **Generate figures** | 🟡 Important | Training curves, efficiency charts, prediction grids — Documented in [RESULTS.md](RESULTS.md) |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
 
 ---
