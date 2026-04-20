@@ -315,7 +315,7 @@ The (96,192,384,768) wider DS-CNN significantly improves upon the standard DS-CN
 
 ## Generalization Test Results (StdMetal Dataset)
 
-To test out-of-distribution generalization, we evaluated the wider DS-CNN model (96,192,384,768) on the StdMetal dataset (271 tiles), which was never seen during training.
+We evaluated the wider DS-CNN model (96,192,384,768) on the StdMetal dataset (271 tiles), which was never seen during training. Here are the results:
 
 ### DS-CNN on StdMetal (271 tiles)
 
@@ -331,10 +331,10 @@ To test out-of-distribution generalization, we evaluated the wider DS-CNN model 
 
 ### Analysis
 
-- **Accuracy on Unseen Data**: The model achieves MSE=0.000426 and SSIM=0.892861 on StdMetal, showing reasonable generalization to new patterns.
+- **Accuracy on Unseen Data**: The model achieves MSE=0.000426 and SSIM=0.892861 on StdMetal, showing reasonable generalization to new patterns. There is some distribution or domain change between MetalSet and StdMetal.
 - **Performance Drop**: Compared to MetalSet test set (MSE=0.000083, SSIM=0.9711), there's a notable drop, indicating domain shift between datasets.
+- **Edge Precision Maintained**: The model achieves EPE=0.0011 on StdMetal and 0.0018 on MetalSet, showing the model still preserves edge precision on unseen layouts.
 - **Efficiency Maintained**: Runtime remains fast at 3.64ms, with the same parameter/FLOPs count as the wider model.
-
 ---
 
 ## File References
