@@ -265,7 +265,7 @@ Experiment with different learning rate makes it clear that DSCNN is highly sens
 
 ## Wider DS-CNN Experiment (Epoch = 20, 3 Width Multipliers)
 
-To investigate whether increasing channel width improves DS-CNN accuracy, we tested three wider variants using epoch=20 and learning rate=2e-4:
+We used three wider DSCNN variants with epoch =20 and learning rate=2e-4 to investigate whether increasing channel width improves DS-CNN accuracy:
 
 ### Feature Width Configurations
 
@@ -277,21 +277,21 @@ To investigate whether increasing channel width improves DS-CNN accuracy, we tes
 
 ### Key Findings
 
-1. **Optimal Width**: The 1.5× wider variant (96,192,384,768) achieves the best validation loss (0.000082) and excellent SSIM (0.971391)
+1. **Optimal Width**: (96,192,384,768) achieves the best validation loss (0.000082) and excellent SSIM (0.971391)
    - This is **18.2% lower MSE** than the standard DS-CNN (0.000099)
    - SSIM improves from 0.965735 → 0.971391 (+0.60%)
    
-2. **Diminishing Returns**: The 2.0× wider variant (128,256,512,1024) offers minimal improvement over 1.5×
+2. **Diminishing Returns**: (128,256,512,1024) wider variant shows minimal improvement.
    - Val loss increases slightly to 0.000083 (+1.2%)
    - Parameter count jumps 78% (from 13.4M → 23.8M)
    - FLOPs increase to 112.9B (79% larger than the 1.5× model)
    
 3. **Parameter vs. Performance Trade-off**:
-   - 1.5× wider: 124% more parameters than standard, 18% better accuracy
-   - 2.0× wider: 298% more parameters than standard, only 17% better accuracy
-   - **1.5× offers the sweet spot for efficiency-accuracy balance**
+   - (96,192,384,768) wider: 124% more parameters than standard, 18% better accuracy
+   - (128,256,512,1024) wider: 298% more parameters than standard, only 17% better accuracy
+   - **(96,192,384,768) offers the best spot for efficiency and performanc balance, nearly matching baseline U-Net with less than half the parameters.**
 
-### Best Wider Variant (1.5×) - Test Evaluation
+### Best Wider Variant (96,192,384,768) is used for the final evaluatin and comparison against baseline U-Net and standard DSCNN (64,128,256,512) - Test Evaluation
 
 | Metric | Value | vs. Standard DS-CNN | vs. Baseline |
 |--------|-------|-------------------|---------------|
@@ -304,12 +304,36 @@ To investigate whether increasing channel width improves DS-CNN accuracy, we tes
 
 ### Interpretation
 
-The 1.5× wider DS-CNN significantly improves upon the standard DS-CNN:
+The (96,192,384,768) wider DS-CNN significantly improves upon the standard DS-CNN:
 - **Accuracy gains**: 18% MSE reduction + SSIM boost — approaching baseline quality
 - **Efficiency retained**: Still 56% fewer parameters and 42% fewer FLOPs than Baseline
-- **Speed trade-off**: 58% slower inference than standard DS-CNN, but still 58% faster than Baseline (19.04ms → 30.02ms)
+- **Speed trade-off**: 58% faster than Baseline (19.04ms → 30.02ms)
 
-**Recommendation**: For applications prioritizing accuracy, use the **1.5× wider DS-CNN (96,192,384,768)**. It recovers most of the accuracy lost vs. Baseline while retaining significant computational savings.
+**Recommendation**: For applications prioritizing accuracy, use the ** wider DS-CNN (96,192,384,768)**. It provided optimal balance between performance and efficiency for inverse lithography tasks. it reduce computation cost and recovers most of the accuracy lost vs. Baseline.
+
+---
+
+## Generalization Test Results (StdMetal Dataset)
+
+To test out-of-distribution generalization, we evaluated the wider DS-CNN model (96,192,384,768) on the StdMetal dataset (271 tiles), which was never seen during training.
+
+### DS-CNN on StdMetal (271 tiles)
+
+| Metric | Value |
+|--------|-------|
+| **MSE** | 0.000426 |
+| **SSIM** | 0.892861 |
+| **EPE (pixels)** | 0.0011 |
+| **Parameters** | 13,441,740 |
+| **FLOPs** | 63,330,320,384 |
+| **Runtime** | 3.64 ms |
+| **Test Samples** | 271 |
+
+### Analysis
+
+- **Accuracy on Unseen Data**: The model achieves MSE=0.000426 and SSIM=0.892861 on StdMetal, showing reasonable generalization to new patterns.
+- **Performance Drop**: Compared to MetalSet test set (MSE=0.000083, SSIM=0.9711), there's a notable drop, indicating domain shift between datasets.
+- **Efficiency Maintained**: Runtime remains fast at 3.64ms, with the same parameter/FLOPs count as the wider model.
 
 ---
 
