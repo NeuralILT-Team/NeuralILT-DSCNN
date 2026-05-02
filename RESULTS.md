@@ -32,9 +32,20 @@ Final training metrics (last 6 epochs):
 | 69 | 0.000026 | 0.000053 | 0.000053 | 0.973722 | 0.000001 |
 | 70 | 0.000025 | 0.000051 | 0.000051 | 0.980396 | 0.000001 |
 
-**Best Validation Loss**: 0.000046 (Epoch 66-67)
+**Best checkpoint: Epoch 67** — Val Loss=0.000046, SSIM=**0.982643** ✨
 
-**Training Complete**:
+Training was then resumed from epoch 70 → 100. The cosine annealing LR schedule (T_max=100) was near its minimum (η_min=1e-6) for the remaining 30 epochs, so validation metrics plateaued and did not surpass the epoch 67 peak:
+
+| Epoch | Train Loss | Val Loss | Val MSE | Val SSIM | Learning Rate |
+|-------|-----------|----------|---------|----------|---------------|
+| 90 | 0.000025 | 0.000052 | 0.000052 | 0.979 | ~0.000001 |
+| 100 | 0.000025 | 0.000053 | 0.000053 | 0.979 | 0.000001 |
+
+**Best checkpoint remains Epoch 67** — not improved during epochs 71-100.
+
+**Test Evaluation at Epoch 100**: MSE=0.000058, SSIM=0.979323 (slight regression vs epoch 67 best)
+
+**Training Complete (100 epochs)**:
 - Checkpoints: `results/checkpoints/baseline/`
 - Logs: `results/logs/baseline/`
 
@@ -42,7 +53,7 @@ Final training metrics (last 6 epochs):
 
 ### DS-CNN U-Net Training
 
-Final training metrics (last 7 epochs):
+Final training metrics at epoch 70 (last 7 epochs of first run):
 
 | Epoch | Train Loss | Val Loss | Val MSE | Val SSIM | Learning Rate |
 |-------|-----------|----------|---------|----------|---------------|
@@ -54,9 +65,20 @@ Final training metrics (last 7 epochs):
 | 69 | 0.000042 | 0.000068 | 0.000068 | 0.976199 | 0.000001 |
 | 70 | 0.000042 | 0.000068 | 0.000068 | 0.976229 | 0.000001 |
 
-**Best Validation Loss**: 0.000067 (Epoch 64-66)
+**Best checkpoint: Epoch 66** — Val Loss=0.000068, SSIM=**0.976096** ✨
 
-**Training Complete**:
+Training was then resumed from epoch 70 → 100. Similar to the baseline, the LR was near minimum and metrics plateaued without surpassing the epoch 66 peak:
+
+| Epoch | Train Loss | Val Loss | Val MSE | Val SSIM | Learning Rate |
+|-------|-----------|----------|---------|----------|---------------|
+| 90 | 0.000042 | 0.000069 | 0.000069 | 0.967 | ~0.000001 |
+| 100 | 0.000042 | 0.000069 | 0.000069 | 0.967 | 0.000001 |
+
+**Best checkpoint remains Epoch 66** — not improved during epochs 71-100.
+
+**Test Evaluation at Epoch 100**: MSE=0.000096, SSIM=0.967278 (slight regression vs epoch 66 best)
+
+**Training Complete (100 epochs)**:
 - Checkpoints: `results/checkpoints/dscnn/`
 - Logs: `results/logs/dscnn/`
 
