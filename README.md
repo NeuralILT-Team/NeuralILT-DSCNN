@@ -36,6 +36,8 @@ Detailed experiment results, comparisons, and visualization summaries are availa
 | Generalization (Exp 4) | ✅ Complete | StdMetal + StdContact out-of-distribution eval |
 | Hyperparameter sweep | ✅ Complete | Sweep LR, features, epochs, batch size |
 | Wider DS-CNN Experiment | ✅ Complete | 1.5× wider channels; see [RESULTS.md](RESULTS.md#wider-ds-cnn-experiment) |
+| Extended training (100 epochs) | ✅ Complete | Resumed from epoch 70 → 100; see [RESULTS.md](RESULTS.md#test-set-evaluation-results) |
+| Generalization (100 epochs) | ✅ Complete | Consistency test on StdMetal + StdContact at 100 epochs |
 | HPC infrastructure | ✅ Complete | SJSU-adapted SLURM scripts, wheel caching |
 | Verification tools | ✅ Complete | verify_env.py, validate_pipeline.py |
 | Collect results | ✅ Complete | Get MSE/SSIM/EPE/FLOPs numbers for the report — See [RESULTS.md](RESULTS.md) |
@@ -45,8 +47,6 @@ Detailed experiment results, comparisons, and visualization summaries are availa
 
 | Step | Priority | Description |
 |------|----------|-------------|
-| **Run experiments on HPC** | 🔴 Critical | Train both models on full MetalSet (16,472 tiles) |
-| **Run generalization test** | 🟡 Important | Evaluate on StdMetal (271 tiles) — Experiment 4 |
 | **Write final report** | 🟡 Important | Results, Discussion, Conclusion sections |
 
 ---
@@ -91,14 +91,16 @@ bash scripts/run_lr_sweep.sh
 bash scripts/run_wider_dscnn.sh
 ```
 
-### Experiment Plan (from proposal)
+### Experiment Plan
 
 | Experiment | Description | Status |
 |------------|-------------|--------|
-| **Exp 1**: Baseline | Train standard U-Net on MetalSet | Code ready, needs HPC run |
-| **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet | Code ready, needs HPC run |
-| **Exp 3**: Comparison | Compare accuracy + efficiency metrics | Code ready, needs Exp 1+2 |
-| **Exp 4**: Generalization | Evaluate both on StdMetal/StdContact | Code ready, needs Exp 1+2 |
+| **Exp 1**: Baseline | Train standard U-Net on MetalSet (20, 70, 100 epochs) | ✅ Done |
+| **Exp 2**: DS-CNN | Train DS-CNN U-Net on MetalSet (20, 70, 100 epochs) | ✅ Done |
+| **Exp 3**: Comparison | Compare accuracy + efficiency metrics across epochs | ✅ Done |
+| **Exp 4**: Generalization | Consistency test on StdMetal/StdContact (100 epochs) | ✅ Done |
+| **Exp 5**: LR Sweep | Learning rate sweep for DS-CNN (5 values, 10 epochs) | ✅ Done |
+| **Exp 6**: Wider DS-CNN | Width multiplier sweep (1.0×, 1.5×, 2.0×) | ✅ Done |
 
 ---
 
