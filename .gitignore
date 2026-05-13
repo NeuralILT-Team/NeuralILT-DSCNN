@@ -22,3 +22,6 @@ logs/
 slurm_*.out
 slurm_*.err
 ilt-env/
+
+# Miscellaneous LaTeX output artifacts
+prj_report/output/
