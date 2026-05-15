@@ -31,7 +31,7 @@
 \IEEEauthorblockA{\textit{MS in Artificial Intelligence} \\ rishi.sheth@sjsu.edu \\ ID: 016122301}
 \and
 \IEEEauthorblockN{Pramod Yadav, SJSU}
-\IEEEauthorblockA{\textit{MS in Artificial Intelligence} \\ pramod.yadav@sjsu.edu \\ ID: xxxx}
+\IEEEauthorblockA{\textit{MS in Artificial Intelligence} \\ pramod.yadav@sjsu.edu \\ ID: 019142370}
 }
 
 
@@ -547,6 +547,23 @@ These findings collectively support the hypothesis that efficient convolutional 
 \subsection{\textbf{Pooja}}
 \subsection{\textbf{Rishi}}
 \subsection{\textbf{Pramod}}
+Pramod contributed to the system architecture, infrastructure, and experimental pipeline of the project. Key areas of contribution include:
+
+\begin{itemize}
+    \item \textbf{Model Architecture Integration:} Contributed to the implementation of the baseline U-Net and DS-CNN U-Net architectures, including the depthwise separable convolution blocks, encoder--decoder wiring, and shared building blocks (\texttt{baseline\_unet.py}, \texttt{ds\_unet.py}, \texttt{blocks.py}, \texttt{common.py}).
+
+    \item \textbf{Training Pipeline:} Contributed to the training framework interfaces, including config-driven hyperparameter management, cosine annealing scheduling, mixed-precision training support, gradient accumulation, and checkpoint save/resume logic (\texttt{train.py}, \texttt{metrics\_logger.py}).
+
+    \item \textbf{Data Pipeline:} Contributed to the data ingestion and preprocessing interfaces, including dataset download automation, GLP-to-PNG format conversion, image resizing, and train/validation/test splitting (\texttt{dataset.py}, \texttt{preprocess.py}, \texttt{download\_data.sh}, \texttt{convert\_glp.py}).
+
+    \item \textbf{Evaluation Framework:} Contributed to the evaluation interfaces for computing MSE, SSIM, EPE, FLOPs, and runtime metrics, as well as the generalization evaluation pipeline for StdMetal and StdContact datasets (\texttt{evaluate.py}, \texttt{metrics/}).
+
+    \item \textbf{HPC Infrastructure:} Contributed to the SLURM-based execution pipeline for the SJSU HPC cluster, including environment setup scripts, GPU scheduling configuration, and shell aliases for streamlined experiment execution (\texttt{run\_hpc.sh}, \texttt{hpc\_aliases.sh}, \texttt{validate\_pipeline.py}).
+
+    \item \textbf{Debugging and Integration:} Assisted in resolving integration issues across the pipeline, including CUDA out-of-memory errors, PyTorch API compatibility fixes, corrupt data handling, and benchmark dataset onboarding.
+
+    \item \textbf{Documentation:} Contributed to the architecture documentation, learning guide, and README maintenance with experiment status and results tables.
+\end{itemize}
 
 
 
