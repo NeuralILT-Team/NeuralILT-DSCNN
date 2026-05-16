@@ -544,6 +544,24 @@ These findings collectively support the hypothesis that efficient convolutional 
 
 \section{\textbf{Contributions}}
 \subsection{\textbf{Rana}}
+Rana contributed to the model optimization, experimentation, and visualization components of the project. Key areas of contribution include:
+
+\begin{itemize}
+    \item \textbf{Model Training and Validation:} Conducted systematic training experiments at 20, 50, 70, and 100 epochs on the SJSU COE HPC cluster to analyze convergence behavior and stability. Identified optimal stopping point based on validation loss and SSIM trends. Training experiments show that extending training beyond 67 epochs led to mild overfitting since validation loss stopped decreasing after that point. Managed GPU-based runs and monitors progress using squeue and scancel jobid.
+    
+    \item \textbf{Model Optimization and Fine-Tuning:} Implemented hyperparameter tuning strategies, including learning rate sweeps, batch size optimization, and regularization techniques. Added the automation scripts \texttt{run\_lr\_sweep.sh}, \texttt{run\_wider\_dscnn.sh}, and \texttt{run\_complete\_workflow.sh} to streamline experimentation. Enhanced model convergence using Adam adaptive optimizer selection and early stopping logic.
+    
+    \item \textbf{Visualization and Reporting:} Generated and committed all the figures used in the final report. Extended the visualization pipeline by adding \texttt{plot\_prediction\_grids()} to \texttt{visualize.py} for side by side comparisons of input, ground truth, and predictions. Authored the complete \texttt{RESULTS.md} section, including Baseline vs DS-CNN evaluation, training curve analysis, and efficiency interpretation.
+    
+    \item \textbf{Generalization and Benchmarking:} Conducted two different generalization experiments, accuracy and consistency generalization. StdMetal (271 complex tiles), which was never seen during training, was used for the accuracy generalization with the ground truth. For the consistency generalization, StdMetal (271 tiles) and StdContact (165 tiles) were used to evaluate cross-model consistency and model stability on unseen distributions. Computed MSE, SSIM, EPE, and runtime for both generalizations.
+    
+    \item \textbf{Documentation and Collaboration:} Authored detailed experiment notes, contributed to README updates, and maintained version control consistency across branches. Assisted in merging experimental branches and resolving conflicts.
+    
+    \item \textbf{Experiment Management and Documentation:} Maintained experiment logs, checkpoints, and CSV summaries for comparative analysis.
+    
+    \item \textbf{Architecture Consistency and Efficiency:} Created a shared constant file (\texttt{constants.py}) defining \texttt{DEFAULT\_FEATURES = [64, 128, 256, 512]} and updated \texttt{baseline\_unet.py} and \texttt{ds\_unet.py} to import it, ensuring consistent architecture widths and fair comparison between Baseline U‑Net and DS‑CNN. Documented efficiency gains (81 % fewer parameters, 74 % fewer FLOPs, 5× faster runtime).
+\end{itemize}
+
 \subsection{\textbf{Pooja}}
 \subsection{\textbf{Rishi}}
 \subsection{\textbf{Pramod}}
@@ -564,6 +582,13 @@ Pramod contributed to the DS-CNN architecture implementation, project infrastruc
 
     \item \textbf{Documentation:} Contributed to the architecture documentation, results tracking, and README maintenance across all training regimes.
 \end{itemize}
+
+
+
+
+
+
+
 
 % Discussion
 \section{\textbf{Discussion}}
@@ -712,4 +737,3 @@ Finally, extending evaluation to larger datasets such as ViaSet would provide a 
 \end{thebibliography}
 
 \end{document}
-
