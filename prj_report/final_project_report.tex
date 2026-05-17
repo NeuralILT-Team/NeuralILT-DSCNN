@@ -1164,6 +1164,19 @@ Rana contributed to the model optimization, experimentation, and visualization c
 \end{itemize}
 
 \subsection{\textbf{Pooja}}
+
+Pooja established the project repository and implemented the baseline data pipeline and reference architecture against which the proposed DS-CNN is evaluated. Her work formed the experimental control for the entire study:
+
+\begin{itemize}
+    \item \textbf{Repository Setup:} Created and initialized the project GitHub repository (\texttt{NeuralILT-DSCNN}), defining the initial directory structure (\texttt{src/}, \texttt{scripts/}, \texttt{configs/}, \texttt{data/splits/}) and authoring the initial project \texttt{README}.
+
+    \item \textbf{Baseline Data Pipeline:} Implemented the data pipeline for the baseline on the \texttt{pooja-preprocessing-baseline} branch, including the \texttt{LithoBenchDataset} PyTorch dataset class with layout--mask pairing and environment-configurable directories (\texttt{dataset.py}), grayscale preprocessing and normalization (\texttt{preprocess.py}), spatial transforms (\texttt{transforms.py}), and structured train/validation/test splitting (\texttt{split\_data.py}), with shell drivers for reproducible execution (\texttt{run\_preprocess.sh}, \texttt{run\_eval.sh}, \texttt{run\_visualize.sh}).
+
+    \item \textbf{Baseline U-Net Architecture:} Implemented the standard encoder--decoder U-Net used as the reference architecture, with four hierarchical levels, \texttt{[64, 128, 256, 512]} feature widths, a 1024-channel bottleneck, and skip-connection concatenation in the decoder ($\sim$31M parameters), together with the baseline training loop (Adam, MSE loss, mixed precision, gradient accumulation) and core evaluation metrics.
+
+    \item \textbf{Containerization and Reproducibility:} Authored the \texttt{Dockerfile} and \texttt{docker-compose.yml} defining containerized services for preprocessing and baseline training, enabling single-command reproducible runs across environments. Validated the end-to-end pipeline through reduced-scale test runs prior to full training.
+\end{itemize}
+
 \subsection{\textbf{Rishi}}
 Rishi contributed to the research discussion, system understanding, experimental workflow organization, and technical documentation of the project. The contributions were primarily focused on supporting the connection between the theoretical foundations of inverse lithography and the practical implementation and evaluation of the models:
 
