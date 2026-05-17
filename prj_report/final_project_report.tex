@@ -15,6 +15,9 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning, arrows.meta, shapes.geometric, calc}
 
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
 \begin{document}
 
 \title{Accelerating Inverse Lithography Technology Using Depthwise Separable CNNs}
@@ -134,6 +137,65 @@ where \( \mathcal{L} \) represents a pixel-wise or structural loss function such
 In this work, we specifically focus on reducing \( \mathcal{C}(f_{\theta}) \) through architectural modification rather than pruning or quantization. The motivation for this choice is that structural efficiency improvements are more stable across datasets and do not require post-training compression steps that may degrade spatial fidelity.
 
 The challenge, therefore, is to design a convolutional architecture that preserves the representational power required for accurate lithography mask prediction while significantly reducing computational redundancy inherent in standard convolution operations.
+
+
+
+
+
+% Optical Lithography Forward Model
+\subsection{\textbf{Optical Lithography Forward Model}}
+
+To ground the inverse lithography problem in physical optics, the lithography imaging system can be formally described using Fourier optics under partially coherent illumination. The printed wafer intensity is governed by the convolution of the mask pattern with the optical system's point spread function (PSF), followed by a nonlinear resist thresholding process.
+
+Let \( M(x,y) \) denote the mask transmission function. The aerial image intensity \( I(x,y) \) at the wafer plane can be expressed as:
+
+\[
+I(x,y) = \mathcal{F}^{-1} \left\{ \mathcal{F}(M(x,y)) \cdot H(f_x,f_y) \right\}
+\]
+
+where \( \mathcal{F} \) and \( \mathcal{F}^{-1} \) denote the Fourier and inverse Fourier transforms respectively, and \( H(f_x,f_y) \) represents the optical transfer function (OTF) of the imaging system.
+
+Equivalently, the imaging process can be formulated in spatial domain as a convolution:
+
+\[
+I(x,y) = (M * h)(x,y)
+\]
+
+where \( h(x,y) \) is the point spread function (PSF) of the lithography system, determined by numerical aperture (NA), wavelength \( \lambda \), and illumination coherence parameters.
+
+Under the Hopkins partially coherent imaging model, the aerial image can be expressed as a sum of coherent modes:
+
+\[
+I(x,y) = \sum_{k} \left| (M \cdot \phi_k) * h_k \right|^2
+\]
+
+where \( \phi_k \) and \( h_k \) represent illumination eigenfunctions and corresponding coherent impulse responses.
+
+The final printed resist pattern is obtained through a nonlinear thresholding operation:
+
+\[
+R(x,y) = \mathbb{I}(I(x,y) > \tau)
+\]
+
+where \( \tau \) is the resist threshold and \( \mathbb{I} \) is the indicator function.
+
+
+
+
+
+% Inverse Lithography Formulation
+\subsection{\textbf{Inverse Lithography Formulation}}
+
+Inverse Lithography Technology (ILT) seeks to recover the optimal mask \( M \) such that the resulting wafer pattern matches a target design \( D \). This can be formulated as a constrained inverse problem:
+
+\[
+\min_{M} \; \mathcal{L}\big(F(M), D\big) + \lambda \mathcal{R}(M)
+\]
+
+where \( F(\cdot) \) denotes the nonlinear lithography forward model defined by Fourier optics, \( \mathcal{L} \) is a fidelity loss function (e.g., MSE or contour error), and \( \mathcal{R} \) is a regularization term enforcing mask manufacturability constraints such as minimum feature size and smoothness.
+
+This formulation highlights that ILT is fundamentally an ill-posed inverse problem governed by a physically structured imaging operator, motivating the use of data-driven surrogate models to approximate \( F^{-1}(\cdot) \) in a computationally efficient manner.
+
 
 
 
@@ -518,12 +580,7 @@ A key contribution of this work lies in the explicit optimization of computation
 In practice, this results in a substantial reduction in both parameter count and floating-point operations. The DS-CNN model reduces parameters by approximately 81 percent compared to the baseline and reduces FLOPs by approximately 74 percent, while maintaining comparable accuracy on the LithoBench MetalSet dataset.
 
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\columnwidth]{../results/efficiency_comparison.png}
-    \caption{Training curves comparing Baseline U-Net vs. DS-CNN U-Net over 70 epochs}
-    \label{fig:efficiency_comparison}
-\end{figure}
+
 
 
 These efficiency gains directly translate into reduced inference latency, which is particularly important for semiconductor design workflows where rapid iteration is required. The reduction in computational cost also enables larger batch sizes during training and more efficient utilization of GPU memory, improving scalability across different hardware environments.
@@ -647,9 +704,6 @@ StdContact & 165   & Consistency Test (cross-model evaluation) \\
 \end{table}
 
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 5: Dataset split summary (MetalSet, StdMetal, StdContact sizes and usage)}}
-\vspace{0.5em}
 
 In addition to MetalSet, two auxiliary datasets are used for generalization evaluation. StdMetal contains 271 samples and StdContact contains 328 samples. These datasets are not used during training and serve exclusively as out-of-distribution test cases to evaluate model robustness under domain shift conditions.
 
@@ -723,7 +777,7 @@ arrow/.style={
 % =========================
 \draw [arrow] (data) -- (prep);
 \draw [arrow] (prep) -- (node1);
-\draw [arrow] (prep) -- (node2);
+\draw [arrow] (prep) to[bend left] (node2);
 
 \draw [arrow] (node1) -- (val);
 \draw [arrow] (node2) -- (val);
@@ -763,9 +817,32 @@ Results demonstrate that DS-CNN achieves comparable performance to the baseline 
 
 This experiment directly compares the baseline and DS-CNN models across multiple training checkpoints. The comparison is performed at 20, 70, and 100 epochs to evaluate both early-stage learning behavior and long-term convergence characteristics.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 6: Accuracy comparison (MSE, SSIM, EPE) across epochs 20, 70, 100}}
-\vspace{0.5em}
+\begin{table}[!t]
+\centering
+\caption{Accuracy comparison across epochs (20, 70, 100)}
+\label{tab:accuracy_epochs}
+\renewcommand{\arraystretch}{1.2}
+
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}} lccc}
+\hline
+\textbf{Metric} & \textbf{Epoch 20} & \textbf{Epoch 70} & \textbf{Epoch 100} \\
+\hline
+
+\multicolumn{4}{c}{\textit{Baseline U-Net}} \\
+MSE  & 0.000098 & 0.000046 & 0.000058 \\
+SSIM & 0.9663   & 0.9823   & 0.9793 \\
+EPE  & 0.0000   & 0.0000   & 0.0025 \\
+\hline
+
+\multicolumn{4}{c}{\textit{DS-CNN U-Net}} \\
+MSE  & 0.000102 & 0.000068 & 0.000096 \\
+SSIM & 0.9649   & 0.9761   & 0.9673 \\
+EPE  & 0.0029   & 0.0011   & 0.0050 \\
+\hline
+
+\end{tabular*}
+\end{table}
+
 
 The results indicate that both models achieve optimal performance around 70 epochs, after which performance plateaus or slightly degrades due to learning rate decay under cosine annealing. This suggests that the optimal training regime for this task lies within intermediate training durations rather than extended training schedules.
 
@@ -775,9 +852,6 @@ To evaluate robustness under domain shift, both models are tested on StdMetal an
 
 The results show that DS-CNN maintains competitive performance under distribution shift, although a moderate degradation in SSIM is observed compared to in-distribution test results. This behavior is expected and indicates that while the model generalizes well, it remains sensitive to structural variations in layout distributions.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 7: Generalization results on StdMetal and StdContact datasets}}
-\vspace{0.5em}
 
 \subsection{\textbf{Experiment 5: Learning Rate Sweep}}
 
@@ -791,9 +865,52 @@ The final experiment investigates the impact of increasing channel width in the 
 
 The results indicate that moderate width scaling improves accuracy while preserving efficiency gains relative to the baseline model. However, excessive width scaling introduces diminishing returns, where additional computational cost does not translate into proportional accuracy improvements.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 7: Width scaling trade-off curve (accuracy vs FLOPs)}}
-\vspace{0.5em}
+
+% Requires:
+% \usepackage{pgfplots}
+% \pgfplotsset{compat=1.18}
+
+\begin{figure}[!t]
+\centering
+
+\begin{tikzpicture}
+\begin{axis}[
+    width=\columnwidth,
+    height=5cm,
+    xlabel={FLOPs (Billions)},
+    ylabel={SSIM},
+    xmin=20, xmax=120,
+    ymin=0.964, ymax=0.973,
+    grid=major,
+    enlargelimits=0.05,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+]
+
+\addplot[
+    color=blue,
+    mark=*,
+    thick
+] coordinates {
+    (28.5,0.9657)
+    (63.3,0.9714)
+    (112.9,0.9718)
+};
+
+% Labels for each point
+\node at (axis cs:28.5,0.9657) [anchor=north east] {\scriptsize 1.0$\times$};
+\node at (axis cs:63.3,0.9714) [anchor=south] {\scriptsize 1.5$\times$};
+\node at (axis cs:112.9,0.9718) [anchor=west] {\scriptsize 2.0$\times$};
+
+\end{axis}
+\end{tikzpicture}
+
+\caption{Width scaling trade-off for DS-CNN architectures. Increasing channel width improves SSIM accuracy but also increases computational cost (FLOPs). The 1.5$\times$ wider DS-CNN achieves the best balance between efficiency and accuracy, while the 2.0$\times$ model provides minimal additional improvement despite substantially higher computation.}
+\label{fig:width_scaling_tradeoff}
+
+\end{figure}
+
+
 
 This experiment highlights the importance of balancing architectural width with computational efficiency, reinforcing the motivation for lightweight convolutional design in ILT applications.
 
@@ -825,9 +942,38 @@ The experimental results are organized to evaluate both predictive accuracy and 
 
 The primary comparison between the baseline U-Net and the proposed DS-CNN architecture is summarized across three training checkpoints corresponding to 20, 70, and 100 epochs. These checkpoints were selected to represent early convergence, optimal convergence, and extended training regimes.
 
+
+
 \vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 8: Overall test performance comparison across epochs (MSE, SSIM, EPE, runtime, FLOPs)}}
-\vspace{0.5em}
+\begin{table}[h]
+\centering
+\caption{Overall test performance comparison between Baseline U-Net and DS-CNN U-Net across different training epochs. Lower MSE, EPE, runtime, and FLOPs indicate better performance, while higher SSIM indicates better structural fidelity. Best values are shown in bold.}
+\label{tab:overall_comparison}
+
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Model} & \textbf{Epoch} & \textbf{MSE} & \textbf{SSIM} & \textbf{EPE} & \textbf{Runtime (ms)} & \textbf{FLOPs} \\
+\hline
+
+Baseline U-Net & 20  & 0.000098 & 0.9663 & \textbf{0.0000} & 19.01 & 109.3B \\
+DS-CNN U-Net  & 20  & 0.000102 & 0.9649 & 0.0029 & 16.92 & \textbf{28.5B} \\
+\hline
+
+Baseline U-Net & 70  & \textbf{0.000046} & \textbf{0.9823} & \textbf{0.0000} & 19.04 & 109.3B \\
+DS-CNN U-Net  & 70  & 0.000068 & 0.9761 & 0.0011 & \textbf{3.78} & \textbf{28.5B} \\
+\hline
+
+Baseline U-Net & 100 & 0.000058 & 0.9793 & 0.0025 & 17.69 & 109.3B \\
+DS-CNN U-Net  & 100 & 0.000096 & 0.9673 & 0.0050 & 15.89 & \textbf{28.5B} \\
+\hline
+
+\end{tabular}
+}
+\end{table}
+
+
+
 
 The results indicate that both models achieve their best performance around 70 epochs, after which additional training does not yield improvements. This plateauing behavior is consistent with the cosine annealing learning rate schedule, which gradually reduces the learning rate to a minimal value, effectively limiting further parameter updates.
 
@@ -837,9 +983,32 @@ At the optimal checkpoint, the baseline model achieves an SSIM of approximately 
 
 A key finding of this study is the trade-off between computational efficiency and predictive accuracy. The DS-CNN architecture reduces the number of parameters by approximately 81 percent and reduces FLOPs by approximately 74 percent compared to the baseline model.
 
+
+
 \vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 8: Accuracy vs FLOPs trade-off curve comparing baseline and DS-CNN variants}}
-\vspace{0.5em}
+\begin{table}[h]
+\centering
+\caption{Accuracy versus computational cost trade-off for Baseline U-Net and DS-CNN variants. The table compares structural similarity (SSIM) against computational complexity measured in FLOPs and parameter count.}
+\label{tab:tradeoff_curve}
+
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lcccc}
+\hline
+\textbf{Model Variant} & \textbf{SSIM} & \textbf{MSE} & \textbf{FLOPs} & \textbf{Parameters} \\
+\hline
+
+Baseline U-Net (70 ep) & \textbf{0.9823} & \textbf{0.000046} & 109.3B & 31.0M \\
+DS-CNN Standard (70 ep) & 0.9761 & 0.000068 & \textbf{28.5B} & \textbf{6.0M} \\
+DS-CNN Wider 1.5$\times$ & 0.9711 & 0.000083 & 63.3B & 13.4M \\
+DS-CNN Wider 2.0$\times$ & 0.9718 & 0.000083 & 112.9B & 23.8M \\
+
+\hline
+\end{tabular}
+}
+\end{table}
+
+
+
 
 Despite this significant reduction in computational cost, DS-CNN maintains competitive performance in terms of SSIM and MSE. The results suggest that a substantial portion of representational redundancy exists in standard convolutional architectures when applied to structured spatial problems such as lithography mask prediction.
 
@@ -849,9 +1018,15 @@ This observation aligns with prior findings in efficient neural architecture des
 
 The training curves for both architectures reveal similar convergence patterns, although DS-CNN exhibits slightly higher variance during early training stages. This behavior can be attributed to the reduced parameter coupling introduced by depthwise separable convolutions, which limits immediate cross-channel feature integration.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 9: Training and validation loss curves for baseline and DS-CNN models}}
-\vspace{0.5em}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{../results/training_curves.png}
+    \caption{Training curves comparing Baseline U-Net vs. DS-CNN U-Net over 70 epochs}
+    \label{fig:efficiency_comparison}
+\end{figure}
+
+
 
 Despite this early instability, DS-CNN converges to a stable solution comparable to the baseline model. The convergence behavior indicates that depthwise separable convolutions do not hinder optimization stability under cosine annealing schedules, provided sufficient training duration is allocated.
 
@@ -859,9 +1034,15 @@ Despite this early instability, DS-CNN converges to a stable solution comparable
 
 Qualitative evaluation of model predictions further confirms the quantitative findings. Both models produce structurally consistent mask predictions that closely match ground truth outputs. However, subtle differences emerge in edge refinement and fine-grained spatial transitions.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 10: Prediction grid comparison (input layout, ground truth, baseline output, DS-CNN output)}}
-\vspace{0.5em}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{../results/prediction_grids.png}
+    \caption{Prediction grid comparison (input layout, ground truth, DS-CNN output)}
+    \label{fig:efficiency_comparison}
+\end{figure}
+
+
 
 The DS-CNN model demonstrates slightly reduced sharpness in high-frequency edge regions, particularly in complex geometric configurations. However, the overall structural integrity of predicted masks remains intact, suggesting that depthwise separable convolutions preserve global spatial structure while slightly reducing local precision.
 
@@ -871,9 +1052,16 @@ This trade-off is particularly relevant in lithography applications where global
 
 The efficiency improvements introduced by DS-CNN are consistent across all evaluation metrics. The reduction in FLOPs translates directly into faster inference times, with DS-CNN achieving approximately a five-fold speed improvement over the baseline model.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 9: Efficiency comparison (parameters, FLOPs, runtime across models)}}
-\vspace{0.5em}
+
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{../results/efficiency_comparison.png}
+    \caption{Training curves comparing Baseline U-Net vs. DS-CNN U-Net over 70 epochs}
+    \label{fig:efficiency_comparison}
+\end{figure}
+
 
 This improvement is particularly significant in large-scale lithography workflows, where mask prediction must be performed repeatedly across large design spaces. Reducing inference latency directly improves iteration speed in design optimization loops.
 
@@ -881,9 +1069,29 @@ This improvement is particularly significant in large-scale lithography workflow
 
 The generalization performance of both models is evaluated using StdMetal and StdContact datasets, which were not included in the training process. These datasets introduce distributional shifts in layout geometry and complexity, providing a more realistic assessment of model robustness.
 
+
+
 \vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 10: Out-of-distribution generalization results on StdMetal and StdContact}}
-\vspace{0.5em}
+\begin{table}[h]
+\centering
+\caption{Out-of-distribution generalization results on StdMetal and StdContact datasets. StdMetal is evaluated against ground truth, while StdContact measures consistency between Baseline and DS-CNN predictions (no ground-truth labels available).}
+\label{tab:ood_generalization}
+
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Dataset} & \textbf{MSE} & \textbf{SSIM} & \textbf{EPE} & \textbf{FLOPs} & \textbf{Params} & \textbf{Runtime (ms)} \\
+\hline
+
+StdMetal (OOD) & 0.000426 & 0.8929 & 0.0011 & 63.3B & 13.44M & 3.64 \\
+
+StdContact (Consistency) & 0.000389 & 0.8950 & -- & 63.3B & 13.44M & 3.64 \\
+
+\hline
+\end{tabular}
+}
+\end{table}
+
 
 The results indicate a measurable degradation in SSIM compared to in-distribution performance. However, DS-CNN maintains structurally coherent predictions, with SSIM values remaining above 0.86 in all cases. This suggests that while domain shift impacts absolute accuracy, the learned representations remain stable across architectures.
 
@@ -893,9 +1101,32 @@ Interestingly, both models exhibit similar degradation patterns, implying that g
 
 The width scaling experiments demonstrate that increasing channel capacity improves accuracy up to a certain threshold. The 1.5× DS-CNN configuration achieves the best trade-off between accuracy and efficiency, outperforming both the standard DS-CNN and the 2.0× variant in terms of validation loss.
 
+
+
 \vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 11: Width scaling performance comparison across multiple DS-CNN variants}}
-\vspace{0.5em}
+\begin{table}[h]
+\centering
+\caption{Width scaling performance comparison across DS-CNN variants. The results show a clear efficiency--accuracy trade-off, where moderate width scaling (1.5$\times$) provides the best Pareto-optimal balance between accuracy and computational cost.}
+\label{tab:width_scaling}
+
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lccccc}
+\hline
+\textbf{Model Variant} & \textbf{SSIM} & \textbf{MSE} & \textbf{FLOPs} & \textbf{Params} & \textbf{Efficiency Rank} \\
+\hline
+
+DS-CNN (1.0$\times$) & 0.9657 & 0.000099 & 28.5B & 6.0M & 2 (most efficient) \\
+DS-CNN (1.5$\times$) & \textbf{0.9714} & \textbf{0.000082} & 63.3B & 13.4M & \textbf{1 (best trade-off)} \\
+DS-CNN (2.0$\times$) & 0.9718 & 0.000083 & 112.9B & 23.8M & 3 (diminishing returns) \\
+Baseline U-Net & 0.9823 & 0.000046 & 109.3B & 31.0M & 4 (least efficient) \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+
+
+
 
 Beyond this optimal scaling point, performance gains diminish while computational cost increases significantly. This suggests that DS-CNN architectures have an optimal capacity regime for this task, beyond which additional representational power does not translate into meaningful accuracy improvements.
 
@@ -987,9 +1218,6 @@ One of the most notable observations is that lithography mask prediction is inhe
 
 Depthwise separable convolutions exploit this property by decoupling spatial filtering from channel mixing. The results suggest that most of the representational burden in standard U-Net architectures is redundant for this task. The DS-CNN model effectively removes this redundancy without significantly affecting the model’s ability to capture key spatial dependencies.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 12: Visual comparison of feature maps between Baseline U-Net and DS-CNN at intermediate layers}}
-\vspace{0.5em}
 
 Another important finding is the stability of DS-CNN under extended training. While early-stage convergence is slightly slower compared to the baseline, both models eventually converge to similar loss regimes. This suggests that depthwise separable convolutions do not fundamentally limit the optimization landscape but instead alter the trajectory of convergence.
 
@@ -1001,9 +1229,7 @@ A central outcome of this work is the explicit characterization of the trade-off
 
 This trade-off is particularly relevant in semiconductor manufacturing workflows, where inference efficiency directly impacts design iteration cycles. Even small reductions in runtime can lead to significant productivity gains when scaled across large design rule verification pipelines.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 13: Efficiency-accuracy Pareto frontier showing Baseline vs DS-CNN vs Wider DS-CNN models}}
-\vspace{0.5em}
+
 
 The results further show that widening the DS-CNN architecture improves accuracy but introduces diminishing returns beyond a certain threshold. This reinforces the idea that efficiency gains are not strictly linear with respect to model capacity scaling.
 
@@ -1077,9 +1303,54 @@ Additionally, exploring transformer-based architectures for inverse lithography 
 
 Finally, extending evaluation to larger datasets such as ViaSet would provide a more comprehensive assessment of scalability and robustness in industrial-scale settings.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 14: Proposed future architecture combining DS-CNN with physics-informed loss and hybrid convolution blocks}}
-\vspace{0.5em}
+
+\begin{figure}[h]
+\centering
+\resizebox{0.85\columnwidth}{!}{
+\begin{tikzpicture}[
+    node distance=1.2cm,
+    block/.style={rectangle, draw, rounded corners, align=center,
+                   minimum width=3.2cm, minimum height=0.8cm, font=\footnotesize},
+    arrow/.style={thick,->,>=Stealth}
+]
+
+% Input
+\node (input) [block] {Input Layout\\(Metal / Contact)};
+
+% Encoder
+\node (enc1) [block, below=of input] {Hybrid Conv Block\\(Std + DS Conv)};
+\node (enc2) [block, below=of enc1] {DS-CNN Encoder};
+
+% Bottleneck
+\node (bottleneck) [block, below=of enc2] {Feature Fusion\\Bottleneck};
+
+% Physics loss (side annotation, not wide block)
+\node (phys) [block, right=2.8cm of enc2, fill=red!5] {Physics-Informed\\Loss};
+
+% Decoder
+\node (dec) [block, below=of bottleneck] {DS-CNN Decoder\\(Skip Connections)};
+
+% Output
+\node (out) [block, below=of dec] {Predicted Mask};
+
+% Main flow
+\draw [arrow] (input) -- (enc1);
+\draw [arrow] (enc1) -- (enc2);
+\draw [arrow] (enc2) -- (bottleneck);
+\draw [arrow] (bottleneck) -- (dec);
+\draw [arrow] (dec) -- (out);
+
+% Physics loss connection (dashed, minimal width impact)
+\draw [arrow, dashed, red] (phys) -- (bottleneck);
+\draw [arrow, dashed, red] (phys) -- (dec);
+
+\end{tikzpicture}
+}
+\caption{Proposed future architecture integrating DS-CNN with hybrid convolution blocks and physics-informed loss. The design introduces inductive physical constraints while maintaining an efficient encoder-decoder structure.}
+\label{fig:future_arch}
+\end{figure}
+
+
 
 
 
@@ -1093,7 +1364,7 @@ Finally, extending evaluation to larger datasets such as ViaSet would provide a 
 
 
 \section{\textit{Github Repository}}
-\textit{Group Project:} \\
+\textit{Group Project Repository:} \\
 \url{https://github.com/NeuralILT-Team/NeuralILT-DSCNN}
 
 
@@ -1121,6 +1392,11 @@ Finally, extending evaluation to larger datasets such as ViaSet would provide a 
 \bibitem{b20} S. Zheng et al., “Model-informed deep learning for process correction in computational lithography,” IEEE Trans. Computer-Aided Design of Integrated Circuits and Systems, 2023.
 \bibitem{b21} X. Ma et al., “Deep model-driven learning for mask feature and SRAF prediction,” IEEE Trans. Computer-Aided Design of Integrated Circuits and Systems, 2022.
 \bibitem{b22} Sandler, Mark, et al. “MobileNetV2: Inverted Residuals and Linear Bottlenecks.” ArXiv.org, 2018, arxiv.org/abs/1801.04381.
+\bibitem{b23} J. W. Goodman, \textit{Introduction to Fourier Optics}, 3rd ed. Roberts and Company Publishers, 2005.
+\bibitem{b24} A. K. Wong, \textit{Resolution Enhancement Techniques in Optical Lithography}. SPIE Press, 2001.
+\bibitem{b25} H. H. Hopkins, “On the diffraction theory of optical imaging systems,” Proc. Royal Society A, 1953.
+\bibitem{b26} M. Born and E. Wolf, \textit{Principles of Optics}. Cambridge University Press, 1999.
+\bibitem{b27} P. Liu et al., “Model-based and data-driven methods in computational lithography: A survey,” IEEE Trans. Semiconductor Manufacturing, 2022.
 
 \end{thebibliography}
 
