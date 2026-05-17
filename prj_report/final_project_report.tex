@@ -1216,7 +1216,9 @@ These findings collectively support the hypothesis that efficient convolutional 
 Rana contributed to the model optimization, experimentation, and visualization components of the project. Key areas of contribution include:
 
 \begin{itemize}
-    \item \textbf{Model Training and Validation:} Conducted systematic training experiments at 20, 50, 70, and 100 epochs on the SJSU COE HPC cluster to analyze convergence behavior and stability. Identified optimal stopping point based on validation loss and SSIM trends. Training experiments show that extending training beyond 67 epochs led to mild overfitting since validation loss stopped decreasing after that point. Managed GPU-based runs and monitors progress using squeue and scancel jobid.
+    \item \textbf{Model Training and Validation:} Conducted systematic training experiments at 20, 50, 70, and 100 epochs on the SJSU COE HPC cluster to analyze convergence behavior and stability. Identified optimal stopping point based on validation loss and SSIM trends. Training experiments show that extending training beyond 67 epochs led to mild overfitting since validation loss stopped decreasing after that point. 
+    
+    \item \textbf{HPC Setup and Execution:} Setup and access the SJSU COE HPC. Transferred project files, executed GPU‑accelerated training jobs using the SLURM scheduler, and performed all experiments and visualizations on the cluster. Monitored job progress and resource usage through squeue and scancel.
     
     \item \textbf{Model Optimization and Fine-Tuning:} Implemented hyperparameter tuning strategies, including learning rate sweeps, batch size optimization, and regularization techniques. Added the automation scripts \texttt{run\_lr\_sweep.sh}, \texttt{run\_wider\_dscnn.sh}, and \texttt{run\_complete\_workflow.sh} to streamline experimentation. Enhanced model convergence using Adam adaptive optimizer selection and early stopping logic.
     
