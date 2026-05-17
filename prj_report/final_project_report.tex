@@ -81,6 +81,84 @@ Machine learning-based approaches have recently been introduced to address this 
 
 However, despite their success, standard U-Net architectures exhibit significant computational inefficiency. The primary source of this inefficiency lies in dense convolution operations, where each output feature map is computed as a weighted combination of all input channels. This results in substantial redundancy, particularly in early and intermediate layers where spatial feature extraction dominates channel-wise interaction.
 
+
+
+
+From an architectural efficiency standpoint, this redundancy suggests that full channel mixing at every spatial convolution step may not be necessary for effective representation learning in ILT tasks. This observation motivates the exploration of more efficient convolutional structures that decouple spatial and channel-wise processing.
+
+In this work, we propose a DS-CNN-based U-Net architecture that replaces standard convolutional layers with depthwise separable convolutions. This design significantly reduces computational cost while preserving representational capacity by separating spatial filtering and channel projection into two distinct operations.
+
+The remainder of this paper is structured as follows. Section II formalizes the ILT problem and introduces the learning-based formulation. Section III reviews prior work in computational lithography and efficient neural architectures. Section IV describes the proposed DS-CNN framework and system implementation, including high-performance computing considerations. Section V details the experimental design. Section VI presents results and analysis. Section VII concludes the paper and discusses limitations and future directions.
+
+
+
+
+
+
+
+
+
+
+% Problem Statement
+\section{\textbf{Problem Statement}}
+
+Inverse Lithography Technology (ILT) can be formally understood as a high-dimensional inverse imaging problem in which the objective is to recover a binary or continuous mask representation that, under a given optical projection system, reproduces a target wafer pattern. Unlike conventional supervised learning tasks where the mapping between input and output is static and well-defined, ILT is inherently constrained by a physically governed forward model that introduces nonlinear distortions, frequency cutoff effects, and process-dependent variations.
+
+The forward lithography process is typically modeled as a convolutional system followed by nonlinear thresholding, where diffraction and interference limit the fidelity of high-frequency spatial information. As a result, the inverse mapping from target design layout to mask configuration is not unique. Multiple candidate masks may produce similar wafer outputs, making the problem fundamentally ill-posed. This ill-posedness is further exacerbated in modern technology nodes where design rules are aggressively scaled, and the feature density increases substantially.
+
+Classical ILT approaches address this problem through iterative numerical optimization. These methods repeatedly simulate the optical imaging process and update the mask design using gradient-based or heuristic optimization techniques. While physically accurate, these approaches scale poorly with layout complexity due to the repeated evaluation of expensive forward models. Each iteration requires solving partial differential approximations of optical propagation or performing Fourier optics-based convolution operations over high-resolution grids. Consequently, computational cost becomes the dominant bottleneck, making these methods unsuitable for large-scale or time-sensitive applications in industrial settings.
+
+Machine learning approaches reformulate ILT as a regression or image-to-image translation problem, where a neural network learns a direct mapping from layout representation to mask output. This eliminates iterative optimization during inference and replaces physics-based simulation with learned approximations. Convolutional neural networks are particularly well-suited for this task due to their ability to capture spatial locality and hierarchical feature representations.
+
+However, despite their effectiveness, standard deep convolutional architectures introduce significant computational overhead. In particular, architectures such as U-Net rely heavily on dense convolution operations, where each output channel is computed as a linear combination of all input channels. This design leads to substantial redundancy in intermediate feature representations, especially in early encoder layers where spatial feature extraction dominates semantic abstraction.
+
+From a computational perspective, the cost of a standard convolutional layer grows quadratically with respect to the number of channels, making it inefficient for high-resolution lithography data where both spatial resolution and channel depth are large. In practical terms, this leads to increased training time, high memory consumption, and reduced scalability when deploying models on constrained hardware environments such as HPC clusters or production-grade inference systems.
+
+
+This computational inefficiency motivates the central problem addressed in this work. Specifically, the objective is not only to approximate the ILT mapping accurately, but to do so under strict computational constraints that reflect real-world deployment requirements in semiconductor design workflows. This introduces a dual-objective optimization problem where both prediction fidelity and computational efficiency must be simultaneously considered.
+
+Let \( X \in \mathbb{R}^{H \times W} \) denote the input layout representation and \( Y \in \mathbb{R}^{H \times W} \) denote the corresponding target lithography mask. The goal is to learn a function \( f_{\theta} \) parameterized by neural network weights \( \theta \) such that:
+
+\[
+f_{\theta}(X) \approx Y
+\]
+
+while minimizing both reconstruction error and computational complexity. The optimization objective can be expressed as:
+
+\[
+\min_{\theta} \; \mathcal{L}(f_{\theta}(X), Y) + \lambda \cdot \mathcal{C}(f_{\theta})
+\]
+
+where \( \mathcal{L} \) represents a pixel-wise or structural loss function such as MSE or SSIM-based loss, and \( \mathcal{C} \) represents a computational cost function proportional to FLOPs or parameter count. The hyperparameter \( \lambda \) controls the trade-off between accuracy and efficiency.
+
+In this work, we specifically focus on reducing \( \mathcal{C}(f_{\theta}) \) through architectural modification rather than pruning or quantization. The motivation for this choice is that structural efficiency improvements are more stable across datasets and do not require post-training compression steps that may degrade spatial fidelity.
+
+The challenge, therefore, is to design a convolutional architecture that preserves the representational power required for accurate lithography mask prediction while significantly reducing computational redundancy inherent in standard convolution operations.
+
+
+
+
+
+
+
+
+
+
+% Related Works
+\section{\textbf{Related Works}}
+
+The problem of computational lithography has been extensively studied over the past two decades due to its central role in enabling advanced semiconductor manufacturing. As feature sizes continue to shrink into deep sub-wavelength regimes, traditional optical projection systems exhibit increasing levels of distortion, requiring sophisticated correction mechanisms during mask synthesis. Early work in this domain focused primarily on physics-based modeling and iterative correction techniques, which remain foundational to modern Inverse Lithography Technology (ILT) pipelines \cite{b4}\cite{b5}.
+
+Classical ILT approaches formulate mask synthesis as an optimization problem governed by the lithographic imaging system. These methods typically rely on repeated simulation of aerial image formation using Fourier optics or equivalent physical approximations. The optimization objective is to minimize the difference between the simulated wafer pattern and the desired target layout. While these approaches achieve high physical fidelity, their computational cost scales poorly with layout complexity due to repeated forward simulations and gradient evaluations. In large-scale industrial settings, this computational burden becomes prohibitive, particularly when dealing with full-chip layouts containing millions of geometric primitives.
+
+To address these limitations, a variety of acceleration techniques have been proposed, including model simplification, reduced-order simulation, and heuristic optimization strategies. However, these methods still rely on explicit physical modeling and therefore retain a significant computational footprint. As a result, research attention has gradually shifted toward data-driven approximations that bypass explicit simulation entirely.
+
+The introduction of machine learning into computational lithography has significantly changed the landscape of ILT research. Instead of explicitly simulating the optical system, machine learning models learn a direct mapping from layout representations to lithographic masks. Early approaches explored shallow neural networks and kernel-based regression methods, but these techniques were limited in their ability to capture complex spatial dependencies inherent in lithographic transformations.
+
+Deep convolutional neural networks (CNNs) have since become the dominant approach due to their ability to model hierarchical spatial structures. In particular, fully convolutional architectures have been widely adopted for image-to-image regression tasks, including lithography mask prediction. Among these, U-Net has emerged as a strong baseline architecture due to its encoder-decoder structure and skip connections, which preserve both global context and fine spatial details.
+
+
+
 \tikzstyle{block} = [rectangle, draw, rounded corners,
 minimum height=1cm, minimum width=1.8cm, align=center]
 
@@ -136,90 +214,9 @@ minimum height=1cm, minimum width=1.8cm, align=center]
 }
 
 \caption{Comparison between classical CNN architecture and U-Net encoder-decoder structure used in this work. U-Net introduces skip connections that preserve spatial resolution, which is critical for inverse lithography mask prediction tasks.}
-\label{fig:cnn_unet}
+\label{fig:cnn_pipeline}
 \end{figure*}
 
-
-
-From an architectural efficiency standpoint, this redundancy suggests that full channel mixing at every spatial convolution step may not be necessary for effective representation learning in ILT tasks. This observation motivates the exploration of more efficient convolutional structures that decouple spatial and channel-wise processing.
-
-In this work, we propose a DS-CNN-based U-Net architecture that replaces standard convolutional layers with depthwise separable convolutions. This design significantly reduces computational cost while preserving representational capacity by separating spatial filtering and channel projection into two distinct operations.
-
-The remainder of this paper is structured as follows. Section II formalizes the ILT problem and introduces the learning-based formulation. Section III reviews prior work in computational lithography and efficient neural architectures. Section IV describes the proposed DS-CNN framework and system implementation, including high-performance computing considerations. Section V details the experimental design. Section VI presents results and analysis. Section VII concludes the paper and discusses limitations and future directions.
-
-
-
-
-
-
-
-
-
-
-% Problem Statement
-\section{\textbf{Problem Statement}}
-
-Inverse Lithography Technology (ILT) can be formally understood as a high-dimensional inverse imaging problem in which the objective is to recover a binary or continuous mask representation that, under a given optical projection system, reproduces a target wafer pattern. Unlike conventional supervised learning tasks where the mapping between input and output is static and well-defined, ILT is inherently constrained by a physically governed forward model that introduces nonlinear distortions, frequency cutoff effects, and process-dependent variations.
-
-The forward lithography process is typically modeled as a convolutional system followed by nonlinear thresholding, where diffraction and interference limit the fidelity of high-frequency spatial information. As a result, the inverse mapping from target design layout to mask configuration is not unique. Multiple candidate masks may produce similar wafer outputs, making the problem fundamentally ill-posed. This ill-posedness is further exacerbated in modern technology nodes where design rules are aggressively scaled, and the feature density increases substantially.
-
-Classical ILT approaches address this problem through iterative numerical optimization. These methods repeatedly simulate the optical imaging process and update the mask design using gradient-based or heuristic optimization techniques. While physically accurate, these approaches scale poorly with layout complexity due to the repeated evaluation of expensive forward models. Each iteration requires solving partial differential approximations of optical propagation or performing Fourier optics-based convolution operations over high-resolution grids. Consequently, computational cost becomes the dominant bottleneck, making these methods unsuitable for large-scale or time-sensitive applications in industrial settings.
-
-Machine learning approaches reformulate ILT as a regression or image-to-image translation problem, where a neural network learns a direct mapping from layout representation to mask output. This eliminates iterative optimization during inference and replaces physics-based simulation with learned approximations. Convolutional neural networks are particularly well-suited for this task due to their ability to capture spatial locality and hierarchical feature representations.
-
-However, despite their effectiveness, standard deep convolutional architectures introduce significant computational overhead. In particular, architectures such as U-Net rely heavily on dense convolution operations, where each output channel is computed as a linear combination of all input channels. This design leads to substantial redundancy in intermediate feature representations, especially in early encoder layers where spatial feature extraction dominates semantic abstraction.
-
-From a computational perspective, the cost of a standard convolutional layer grows quadratically with respect to the number of channels, making it inefficient for high-resolution lithography data where both spatial resolution and channel depth are large. In practical terms, this leads to increased training time, high memory consumption, and reduced scalability when deploying models on constrained hardware environments such as HPC clusters or production-grade inference systems.
-
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 1: Computational bottleneck comparison between classical ILT and CNN-based ILT (INSERT YOUR FLOPs + runtime TABLE HERE)}}
-\vspace{0.5em}
-
-This computational inefficiency motivates the central problem addressed in this work. Specifically, the objective is not only to approximate the ILT mapping accurately, but to do so under strict computational constraints that reflect real-world deployment requirements in semiconductor design workflows. This introduces a dual-objective optimization problem where both prediction fidelity and computational efficiency must be simultaneously considered.
-
-Let \( X \in \mathbb{R}^{H \times W} \) denote the input layout representation and \( Y \in \mathbb{R}^{H \times W} \) denote the corresponding target lithography mask. The goal is to learn a function \( f_{\theta} \) parameterized by neural network weights \( \theta \) such that:
-
-\[
-f_{\theta}(X) \approx Y
-\]
-
-while minimizing both reconstruction error and computational complexity. The optimization objective can be expressed as:
-
-\[
-\min_{\theta} \; \mathcal{L}(f_{\theta}(X), Y) + \lambda \cdot \mathcal{C}(f_{\theta})
-\]
-
-where \( \mathcal{L} \) represents a pixel-wise or structural loss function such as MSE or SSIM-based loss, and \( \mathcal{C} \) represents a computational cost function proportional to FLOPs or parameter count. The hyperparameter \( \lambda \) controls the trade-off between accuracy and efficiency.
-
-In this work, we specifically focus on reducing \( \mathcal{C}(f_{\theta}) \) through architectural modification rather than pruning or quantization. The motivation for this choice is that structural efficiency improvements are more stable across datasets and do not require post-training compression steps that may degrade spatial fidelity.
-
-The challenge, therefore, is to design a convolutional architecture that preserves the representational power required for accurate lithography mask prediction while significantly reducing computational redundancy inherent in standard convolution operations.
-
-
-
-
-
-
-
-
-
-
-% Related Works
-\section{\textbf{Related Works}}
-
-The problem of computational lithography has been extensively studied over the past two decades due to its central role in enabling advanced semiconductor manufacturing. As feature sizes continue to shrink into deep sub-wavelength regimes, traditional optical projection systems exhibit increasing levels of distortion, requiring sophisticated correction mechanisms during mask synthesis. Early work in this domain focused primarily on physics-based modeling and iterative correction techniques, which remain foundational to modern Inverse Lithography Technology (ILT) pipelines \cite{b4}\cite{b5}.
-
-Classical ILT approaches formulate mask synthesis as an optimization problem governed by the lithographic imaging system. These methods typically rely on repeated simulation of aerial image formation using Fourier optics or equivalent physical approximations. The optimization objective is to minimize the difference between the simulated wafer pattern and the desired target layout. While these approaches achieve high physical fidelity, their computational cost scales poorly with layout complexity due to repeated forward simulations and gradient evaluations. In large-scale industrial settings, this computational burden becomes prohibitive, particularly when dealing with full-chip layouts containing millions of geometric primitives.
-
-To address these limitations, a variety of acceleration techniques have been proposed, including model simplification, reduced-order simulation, and heuristic optimization strategies. However, these methods still rely on explicit physical modeling and therefore retain a significant computational footprint. As a result, research attention has gradually shifted toward data-driven approximations that bypass explicit simulation entirely.
-
-The introduction of machine learning into computational lithography has significantly changed the landscape of ILT research. Instead of explicitly simulating the optical system, machine learning models learn a direct mapping from layout representations to lithographic masks. Early approaches explored shallow neural networks and kernel-based regression methods, but these techniques were limited in their ability to capture complex spatial dependencies inherent in lithographic transformations.
-
-Deep convolutional neural networks (CNNs) have since become the dominant approach due to their ability to model hierarchical spatial structures. In particular, fully convolutional architectures have been widely adopted for image-to-image regression tasks, including lithography mask prediction. Among these, U-Net has emerged as a strong baseline architecture due to its encoder-decoder structure and skip connections, which preserve both global context and fine spatial details.
-
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 2: Overview of CNN-based ILT pipeline using U-Net architecture (INSERT YOUR MODEL DIAGRAM HERE)}}
-\vspace{0.5em}
 
 Recent datasets such as LithoBench \cite{b1}\cite{b2} have played a critical role in standardizing evaluation protocols for machine learning-based ILT. LithoBench provides large-scale simulated datasets that enable consistent benchmarking of different model architectures under controlled conditions. The availability of such datasets has significantly accelerated research in data-driven lithography modeling by enabling reproducible comparisons between competing approaches.
 
@@ -235,9 +232,107 @@ Recent works in machine learning-based lithography have also explored alternativ
 
 Other studies have focused on surrogate modeling of lithographic processes, where neural networks are trained to approximate the forward optical system or intermediate physical quantities such as aerial images \cite{b8}\cite{b10}. While these surrogate models improve simulation speed, they do not directly address the inverse problem of mask synthesis in an end-to-end manner.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 2: Summary comparison of ILT approaches (Physics-based vs CNN vs GAN vs DS-CNN) — TO BE FILLED WITH YOUR RESULTS + LITERATURE VALUES}}
-\vspace{0.5em}
+% Requires:
+% \usepackage{tikz}
+% \usetikzlibrary{positioning,arrows.meta}
+
+\tikzset{
+layer/.style={
+    rectangle,
+    draw=black,
+    rounded corners=3pt,
+    minimum width=2.2cm,
+    minimum height=0.9cm,
+    align=center,
+    fill=gray!10
+},
+skip/.style={
+    dashed,
+    thick,
+    ->,
+    >=Stealth
+},
+flow/.style={
+    thick,
+    ->,
+    >=Stealth
+}
+}
+
+\begin{figure}[!t]
+\centering
+
+\begin{tikzpicture}[node distance=0.9cm]
+
+% ======================
+% Encoder
+% ======================
+\node (input) [layer] {Input Mask};
+
+\node (enc1) [layer, below=of input] {Encoder Block 1\\Conv + ReLU};
+
+\node (enc2) [layer, below=of enc1] {Encoder Block 2\\Conv + ReLU};
+
+\node (enc3) [layer, below=of enc2] {Encoder Block 3\\Conv + ReLU};
+
+% ======================
+% Bottleneck
+% ======================
+\node (bottleneck) [layer, below=1.2cm of enc3, fill=blue!10]
+{Bottleneck Layer};
+
+% ======================
+% Decoder
+% ======================
+\node (dec3) [layer, below=1.2cm of bottleneck]
+{Decoder Block 3\\Upsample + Conv};
+
+\node (dec2) [layer, below=of dec3]
+{Decoder Block 2\\Upsample + Conv};
+
+\node (dec1) [layer, below=of dec2]
+{Decoder Block 1\\Upsample + Conv};
+
+\node (output) [layer, below=of dec1, fill=green!10]
+{Predicted Mask};
+
+% ======================
+% Main flow
+% ======================
+\draw [flow] (input) -- (enc1);
+\draw [flow] (enc1) -- (enc2);
+\draw [flow] (enc2) -- (enc3);
+\draw [flow] (enc3) -- (bottleneck);
+
+\draw [flow] (bottleneck) -- (dec3);
+\draw [flow] (dec3) -- (dec2);
+\draw [flow] (dec2) -- (dec1);
+\draw [flow] (dec1) -- (output);
+
+% ======================
+% Skip connections
+% ======================
+\draw [skip] ($(enc1.east)+(0.15,0)$)
+to[out=0,in=0]
+($(dec1.east)+(0.15,0)$);
+
+\draw [skip] ($(enc2.east)+(0.15,0)$)
+to[out=0,in=0]
+($(dec2.east)+(0.15,0)$);
+
+\draw [skip] ($(enc3.east)+(0.15,0)$)
+to[out=0,in=0]
+($(dec3.east)+(0.15,0)$);
+
+% Labels
+\node[left=0.5cm of enc2] {\textbf{Encoder}};
+\node[left=0.5cm of dec2] {\textbf{Decoder}};
+
+\end{tikzpicture}
+
+\caption{Baseline U-Net architecture used for inverse lithography mask prediction. The network follows an encoder-decoder structure with skip connections that preserve spatial information between corresponding feature levels.}
+\label{fig:unet_architecture}
+\end{figure}
 
 A key observation from prior literature is that most improvements in ILT modeling have focused on either increasing physical accuracy or improving generative realism, with comparatively less emphasis on computational efficiency at the architectural level. In particular, there is a lack of systematic study on how modern efficient convolutional designs, such as depthwise separable convolutions, affect ILT performance when integrated into encoder-decoder architectures.
 
@@ -272,9 +367,6 @@ The skip connections play a crucial role in preserving fine-grained spatial stru
 
 Despite its effectiveness, this architecture relies heavily on dense convolutional operations. Each convolution layer performs full channel mixing, which results in significant redundancy in intermediate feature representations. This redundancy becomes particularly expensive in deeper layers where the number of channels increases substantially.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 3: Baseline U-Net architecture diagram (encoder-decoder with skip connections)}}
-\vspace{0.5em}
 
 The baseline model contains approximately 31 million trainable parameters and requires over 100 billion floating-point operations per forward pass, making it computationally expensive for large-scale deployment scenarios.
 
@@ -292,9 +384,91 @@ O(K^2 \cdot C_{in}) + O(C_{in} \cdot C_{out})
 
 which yields substantial savings when both spatial and channel dimensions are large.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 4: Standard convolution vs depthwise separable convolution comparison diagram}}
-\vspace{0.5em}
+
+% Requires:
+% \usepackage{tikz}
+% \usetikzlibrary{positioning,arrows.meta,calc}
+
+\tikzset{
+block/.style={
+    rectangle,
+    draw=black,
+    rounded corners=3pt,
+    minimum width=2.2cm,
+    minimum height=0.9cm,
+    align=center,
+    font=\small,
+    fill=gray!8
+},
+arrow/.style={
+    thick,
+    ->,
+    >=Stealth
+},
+title/.style={
+    font=\bfseries\small
+}
+}
+
+\begin{figure*}[t]
+\centering
+\resizebox{0.95\textwidth}{!}{
+\begin{tikzpicture}[node distance=1.4cm]
+
+% =====================================================
+% STANDARD CONVOLUTION
+% =====================================================
+\node (in1) [block] {Input\\Feature Map};
+
+\node (stdconv) [block, right=of in1] {Standard\\Convolution};
+
+\node (stdout) [block, right=of stdconv] {Output\\Feature Map};
+
+\draw [arrow] (in1) -- (stdconv);
+\draw [arrow] (stdconv) -- (stdout);
+
+\node[title] at ($(stdconv)+(0,-1.3)$)
+{Standard Convolution};
+
+% Cost annotation
+\node[align=center, font=\scriptsize] at ($(stdconv)+(0,1.4)$)
+{High computation\\High parameter cost};
+
+% =====================================================
+% DEPTHWISE SEPARABLE CONV
+% =====================================================
+\node (in2) [block, below=3.0cm of in1] {Input\\Feature Map};
+
+\node (dw) [block, right=of in2] {Depthwise\\Convolution};
+
+\node (pw) [block, right=of dw] {Pointwise\\(1$\times$1 Conv)};
+
+\node (out2) [block, right=of pw] {Output\\Feature Map};
+
+\draw [arrow] (in2) -- (dw);
+\draw [arrow] (dw) -- (pw);
+\draw [arrow] (pw) -- (out2);
+
+\node[title] at ($(pw)+(0,-1.3)$)
+{Depthwise Separable Convolution};
+
+% Cost annotation
+\node[align=center, font=\scriptsize] at ($(pw)+(0,1.4)$)
+{Low computation\\Reduced parameters};
+
+% =====================================================
+% VISUAL SEPARATION LINE (OPTIONAL)
+% =====================================================
+\draw[dashed, gray] (-0.5,-1.2) -- (12,-1.2);
+
+\end{tikzpicture}
+}
+
+\caption{Comparison between standard convolution and depthwise separable convolution. Depthwise separable convolution decomposes spatial and channel-wise filtering into separate operations, significantly reducing computational cost while maintaining representational power, which is critical for efficient ILT inference.}
+\label{fig:conv_comparison}
+\end{figure*}
+
+
 
 In the proposed DS-CNN U-Net architecture, every convolutional layer in both encoder and decoder blocks is replaced with this factorized operation. Importantly, the overall macro-architecture remains identical to the baseline model. This design choice ensures that any observed performance differences can be attributed primarily to the convolutional efficiency transformation rather than architectural redesign.
 
@@ -306,9 +480,34 @@ Training is performed using a cosine annealing learning rate schedule, which gra
 
 The training process is distributed across a high-performance computing (HPC) environment using SLURM job scheduling. This allows large-scale training on GPU nodes while maintaining reproducibility and isolation of experimental configurations. The pipeline includes automated dataset preprocessing, normalization, and splitting into training, validation, and test partitions.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 3: Training configuration summary (batch size, LR, epochs, optimizer, scheduler)}}
-\vspace{0.5em}
+
+\begin{figure}[!t]
+\centering
+\fbox{
+\begin{minipage}{0.95\columnwidth}
+\centering
+\vspace{0.3em}
+
+\textbf{Training Configuration Summary}\\[0.5em]
+
+\begin{tabular}{ll}
+Batch Size & [BATCH SIZE] \\
+Epochs & 100 \\
+Initial Learning Rate & $1 \times 10^{-3}$ \\
+Optimizer & AdamW \\
+Scheduler & Cosine Annealing \\
+Weight Decay & $1 \times 10^{-4}$ \\
+Loss Function & MSE + SSIM \\
+\end{tabular}
+
+\vspace{0.3em}
+\end{minipage}
+}
+\caption{Training configuration used for Baseline U-Net and DS-CNN U-Net experiments.}
+\label{fig:training_config}
+\end{figure}
+
+
 
 The use of HPC infrastructure is particularly important in this work due to the computational intensity of training both baseline and DS-CNN models across multiple experimental configurations, including learning rate sweeps and architectural width scaling experiments.
 
@@ -318,9 +517,14 @@ A key contribution of this work lies in the explicit optimization of computation
 
 In practice, this results in a substantial reduction in both parameter count and floating-point operations. The DS-CNN model reduces parameters by approximately 81 percent compared to the baseline and reduces FLOPs by approximately 74 percent, while maintaining comparable accuracy on the LithoBench MetalSet dataset.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{TABLE 4: FLOPs, parameter count, and runtime comparison between Baseline and DS-CNN}}
-\vspace{0.5em}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{../results/efficiency_comparison.png}
+    \caption{Training curves comparing Baseline U-Net vs. DS-CNN U-Net over 70 epochs}
+    \label{fig:efficiency_comparison}
+\end{figure}
+
 
 These efficiency gains directly translate into reduced inference latency, which is particularly important for semiconductor design workflows where rapid iteration is required. The reduction in computational cost also enables larger batch sizes during training and more efficient utilization of GPU memory, improving scalability across different hardware environments.
 
@@ -332,9 +536,70 @@ The dataset pipeline includes preprocessing steps such as grayscale normalizatio
 
 All experiments are reproducible and controlled through configuration files, allowing systematic variation of hyperparameters such as learning rate, batch size, and channel width multipliers. This design supports extensive experimentation including learning rate sweeps and architectural scaling studies.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 5: Full system pipeline diagram (data → preprocessing → training → evaluation → visualization)}}
-\vspace{0.5em}
+
+% Requires:
+% \usepackage{tikz}
+% \usetikzlibrary{positioning,arrows.meta}
+
+\tikzset{
+block/.style={
+    rectangle,
+    draw=black,
+    rounded corners=3pt,
+    minimum width=2.6cm,
+    minimum height=1cm,
+    align=center,
+    font=\small,
+    fill=gray!8
+},
+arrow/.style={
+    thick,
+    ->,
+    >=Stealth
+}
+}
+
+\begin{figure*}[t]
+\centering
+
+\resizebox{0.95\textwidth}{!}{
+\begin{tikzpicture}[node distance=1.8cm]
+
+% =========================
+% PIPELINE NODES
+% =========================
+\node (data) [block] {Dataset\\(LithoBench MetalSet)};
+
+\node (pre) [block, right=of data] {Preprocessing\\Normalization + Augmentation};
+
+\node (train) [block, right=of pre] {Training\\DS-CNN / U-Net\\(AdamW + Cosine LR)};
+
+\node (eval) [block, right=of train] {Evaluation\\MSE + SSIM + EPE};
+
+\node (viz) [block, right=of eval] {Visualization\\Loss curves + Masks + Metrics};
+
+% =========================
+% FLOW ARROWS
+% =========================
+\draw [arrow] (data) -- (pre);
+\draw [arrow] (pre) -- (train);
+\draw [arrow] (train) -- (eval);
+\draw [arrow] (eval) -- (viz);
+
+% =========================
+% TITLE
+% =========================
+\node[font=\bfseries\small] at ($(train)+(0,-1.5)$)
+{Full ILT System Pipeline};
+
+\end{tikzpicture}
+}
+
+\caption{Full system pipeline for inverse lithography mask prediction. The workflow includes dataset preparation, preprocessing, model training with DS-CNN/U-Net architectures, quantitative evaluation, and visualization of results.}
+\label{fig:full_pipeline}
+\end{figure*}
+
+
 
 The combination of architectural efficiency, reproducible pipeline design, and HPC-based execution forms the core system contribution of this work.
 
@@ -359,6 +624,29 @@ The LithoBench MetalSet dataset provides a standardized benchmark for evaluating
 
 The dataset is partitioned into training, validation, and test splits using an 80/10/10 ratio. This split ensures that models are evaluated on unseen samples during testing while maintaining sufficient data diversity during training. The preprocessing pipeline includes normalization of pixel intensities and resizing operations to ensure uniform tensor dimensions across all samples.
 
+
+
+\begin{table}[!t]
+\centering
+\caption{Dataset composition and usage in ILT experiments}
+\label{tab:dataset_split}
+\renewcommand{\arraystretch}{1.2}
+
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lcc}
+\hline
+\textbf{Dataset} & \textbf{Number of Samples} & \textbf{Usage} \\
+\hline
+MetalSet   & 1,643 & Training + Testing (in-domain) \\
+StdMetal   & 271   & Generalization Test (unseen layouts) \\
+StdContact & 165   & Consistency Test (cross-model evaluation) \\
+\hline
+\end{tabular}
+}
+
+\end{table}
+
+
 \vspace{0.5em}
 \noindent\textbf{\textcolor{red}{TABLE 5: Dataset split summary (MetalSet, StdMetal, StdContact sizes and usage)}}
 \vspace{0.5em}
@@ -373,9 +661,91 @@ Each model is trained using the Adam optimizer with a cosine annealing learning 
 
 The evaluation metrics used in this study include Mean Squared Error (MSE), Structural Similarity Index (SSIM), Edge Placement Error (EPE), parameter count, FLOPs, and inference runtime. These metrics collectively capture both predictive accuracy and computational efficiency, which are equally important for practical ILT deployment.
 
-\vspace{0.5em}
-\noindent\textbf{\textcolor{red}{FIGURE 6: Experimental pipeline showing training, validation, and evaluation flow across HPC nodes}}
-\vspace{0.5em}
+
+% Requires:
+% \usepackage{tikz}
+% \usetikzlibrary{positioning,arrows.meta}
+
+\tikzset{
+block/.style={
+    rectangle,
+    draw=black,
+    rounded corners=3pt,
+    minimum width=2.6cm,
+    minimum height=1cm,
+    align=center,
+    font=\small,
+    fill=gray!8
+},
+arrow/.style={
+    thick,
+    ->,
+    >=Stealth
+}
+}
+
+\begin{figure*}[t]
+\centering
+
+\resizebox{0.95\textwidth}{!}{
+\begin{tikzpicture}[node distance=1.6cm]
+
+% =========================
+% DATA STAGE
+% =========================
+\node (data) [block] {Dataset\\MetalSet / StdMetal / StdContact};
+
+\node (prep) [block, right=of data] {Preprocessing\\Normalization + Augmentation};
+
+% =========================
+% HPC TRAINING NODES (LOGICAL)
+% =========================
+\node (node1) [block, right=of prep] {HPC Node 1\\Baseline U-Net Training};
+
+\node (node2) [block, right=of node1] {HPC Node 2\\DS-CNN Training};
+
+% =========================
+% VALIDATION LOOP
+% =========================
+\node (val) [block, below=1.6cm of node1] {Validation Loop\\Loss / SSIM / MSE Tracking};
+
+\node (ckpt) [block, right=of val] {Checkpointing\\Best Epoch (66--70) Selection};
+
+% =========================
+% EVALUATION STAGE
+% =========================
+\node (eval) [block, right=of ckpt] {Evaluation\\Test Sets (20 / 70 / 100 epochs)};
+
+\node (post) [block, right=of eval] {Post-Processing\\Metrics + Consistency Tests};
+
+% =========================
+% FLOWS
+% =========================
+\draw [arrow] (data) -- (prep);
+\draw [arrow] (prep) -- (node1);
+\draw [arrow] (prep) -- (node2);
+
+\draw [arrow] (node1) -- (val);
+\draw [arrow] (node2) -- (val);
+
+\draw [arrow] (val) -- (ckpt);
+\draw [arrow] (ckpt) -- (eval);
+\draw [arrow] (eval) -- (post);
+
+% =========================
+% TITLE
+% =========================
+\node[font=\bfseries\small] at ($(node1)+(0,-1.6)$)
+{Experimental Training and Evaluation Pipeline};
+
+\end{tikzpicture}
+}
+
+\caption{Experimental pipeline showing training, validation, and evaluation workflow for ILT models. The system includes dataset processing, parallel model training, validation-driven checkpoint selection, and multi-stage evaluation across test datasets and epochs.}
+\label{fig:hpc_pipeline}
+\end{figure*}
+
+
 
 \subsection{\textbf{Experiment 1: Baseline U-Net Training}}
 
@@ -559,7 +929,7 @@ Rana contributed to the model optimization, experimentation, and visualization c
     
     \item \textbf{Experiment Management and Documentation:} Maintained experiment logs, checkpoints, and CSV summaries for comparative analysis.
     
-    \item \textbf{Architecture Consistency and Efficiency:} Created a shared constant file (\texttt{constants.py}) defining \texttt{DEFAULT\_FEATURES = [64, 128, 256, 512]} and updated \texttt{baseline\_unet.py} and \texttt{ds\_unet.py} to import it, ensuring consistent architecture widths and fair comparison between Baseline U‑Net and DS‑CNN.
+    \item \textbf{Architecture Consistency and Efficiency:} Created a shared constant file (\texttt{constants.py}) defining \texttt{DEFAULT\_FEATURES = [64, 128, 256, 512]} and updated \texttt{baseline\_unet.py} and \texttt{ds\_unet.py} to import it, ensuring consistent architecture widths and fair comparison between Baseline U‑Net and DS‑CNN.
 \end{itemize}
 
 \subsection{\textbf{Pooja}}
