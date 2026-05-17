@@ -705,7 +705,7 @@ StdContact & 165   & Consistency Test (cross-model evaluation) \\
 
 
 
-In addition to MetalSet, two auxiliary datasets are used for generalization evaluation. StdMetal contains 271 samples and StdContact contains 328 samples. These datasets are not used during training and serve exclusively as out-of-distribution test cases to evaluate model robustness under domain shift conditions.
+In addition to MetalSet, two auxiliary datasets are used for generalization evaluation. StdMetal contains 271 samples and StdContact contains 165 samples. These datasets are not used during training and serve exclusively as out-of-distribution test cases to evaluate model robustness under domain shift conditions.
 
 \subsection{\textbf{Experiment Set-Up}}
 
@@ -857,13 +857,81 @@ The results show that DS-CNN maintains competitive performance under distributio
 
 A learning rate sweep is conducted to evaluate the sensitivity of DS-CNN performance to optimization hyperparameters. Learning rates ranging from \(1 \times 10^{-3}\) to \(1 \times 10^{-5}\) are tested over short training cycles of 10 epochs.
 
+\begin{table}[htbp]
+\centering
+\caption{Learning Rate Sweep Results}
+\label{tab:lr_sweep}
+\renewcommand{\arraystretch}{1.2}
+
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Learning Rate} & \textbf{Best Val Loss} & \textbf{Best Val MSE} & \textbf{Best Val SSIM} & \textbf{Epochs to Convergence} \\
+\hline
+1e-3   & 0.000101 & 0.000101 & 0.965317 & $\sim$3 \\
+5e-4   & 0.000108 & 0.000108 & 0.962196 & $\sim$4 \\
+1e-4   & 0.000175 & 0.000175 & 0.927762 & $\sim$7 \\
+5e-5   & 0.000268 & 0.000268 & 0.849466 & $\sim$10 (n.c.) \\
+1e-5   & 0.001923 & 0.001923 & 0.334645 & $\sim$10 (n.c.) \\
+\hline
+\end{tabular}
+}
+\end{table}
+
 The results demonstrate that higher learning rates significantly improve convergence speed and final performance, with \(1 \times 10^{-3}\) yielding the best validation loss. Lower learning rates result in slower convergence and significantly degraded performance within the same training budget.
+
 
 \subsection{\textbf{Experiment 6: Width Scaling Study}}
 
 The final experiment investigates the impact of increasing channel width in the DS-CNN architecture. Three configurations are evaluated: standard width, 1.5× width, and 2.0× width scaling.
+We used three wider DSCNN variants with epoch =20 and learning rate=2e-4 to investigate whether increasing channel width improves DS-CNN accuracy:
+
+\begin{table}[htbp]
+\centering
+\caption{Feature Width Configurations}
+\label{tab:width_config}
+\renewcommand{\arraystretch}{1.2}
+
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Channel Config} & \textbf{Width Multiplier} & \textbf{Params} & \textbf{FLOPs} & \textbf{Best Val Loss} & \textbf{Best Val SSIM} \\
+\hline
+64, 128, 256, 512   & 1.0$\times$ (Standard) & 5,999,756  & 28.5B  & 0.000099 & 0.965735 \\
+96, 192, 384, 768   & 1.5$\times$ (Wider)    & 13,441,740 & 63.3B  & 0.000082 & 0.971391 \\
+128, 256, 512, 1024 & 2.0$\times$ (Widest)   & 23,845,132 & 112.9B & 0.000083 & 0.971823 \\
+\hline
+\end{tabular}
+}
+\end{table}
+
 
 The results indicate that moderate width scaling improves accuracy while preserving efficiency gains relative to the baseline model. However, excessive width scaling introduces diminishing returns, where additional computational cost does not translate into proportional accuracy improvements.
+
+Best Wider Variant (96,192,384,768) is used for the final evaluation and comparison against baseline U-Net and standard DSCNN (64,128,256,512) - Test Evaluation.
+
+\begin{table}[htbp]
+\centering
+\caption{Performance Comparison of Wider DS-CNN vs. Standard DS-CNN and Baseline U-Net}
+\label{tab:comparison_metrics}
+\renewcommand{\arraystretch}{1.2}
+
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Metric} & \textbf{Value} & \textbf{vs. Standard DS-CNN} & \textbf{vs. Baseline} \\
+\hline
+MSE         & 0.000083  & $-18.2\%$ (↓) & $-80.4\%$ (↓) \\
+SSIM        & 0.9711    & $+0.60\%$ (↑) & $-1.14\%$ (↓) \\
+EPE         & 0.0018 px & $+55\%$ (↑)   & $\infty$ (edge placement much better) \\
+Parameters  & 13.4M     & 2.24$\times$ wider & $-56.7\%$ (vs. baseline) \\
+FLOPs       & 63.3B     & 2.22$\times$ more  & $-42.1\%$ (vs. baseline) \\
+Runtime     & 30.02 ms  & 1.58$\times$ slower & 1.58$\times$ slower \\
+\hline
+\end{tabular}
+}
+\end{table}
+
 
 
 % Requires:
